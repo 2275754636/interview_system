@@ -1,0 +1,11 @@
+# 大学生五育并举访谈智能体 - 依赖列表
+
+# 核心依赖
+openai>=1.0.0          # 百度千帆API（兼容OpenAI SDK）
+
+# Web界面依赖
+gradio>=4.0.0          # Web界面框架
+qrcode[pil]>=7.0       # 二维码生成
+
+# 可选依赖（已内置于Python标准库）
+# json, datetime, os, random, logging, threading, uuid, socket
