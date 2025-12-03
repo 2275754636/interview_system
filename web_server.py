@@ -31,6 +31,7 @@ class WebInterviewHandler:
     def __init__(self):
         self.session: Optional[InterviewSession] = None
         self.engine: Optional[InterviewEngine] = None
+        self._initialized = False
     
     def initialize(self, user_name: str = None) -> Tuple[List, str]:
         """
@@ -43,6 +44,7 @@ class WebInterviewHandler:
             (聊天历史, 状态消息)
         """
         self.session, self.engine = create_interview(user_name or "Web访谈者")
+        self._initialized = True
         
         # 获取第一个问题
         first_question = self.engine.get_current_question()
@@ -69,6 +71,25 @@ class WebInterviewHandler:
         
         return history, ""
     
+    def lazy_initialize(self) -> Tuple[List, str]:
+        """
+        延迟初始化 - 仅返回欢迎消息，不创建完整会话
+        用于页面首次加载时快速响应
+        
+        Returns:
+            (聊天历史, 状态消息)
+        """
+        # 直接返回欢迎消息，不做任何耗时操作
+        welcome = (
+            "👋 你好，欢迎参加本次访谈！\n\n"
+            "接下来我会向你提出 6 个问题，话题涉及你在学校、家庭和社区中的经历与感受。\n\n"
+            "💬 请放松心情，用自己的话分享真实想法，没有标准答案。\n"
+            "⏭️ 如果某个问题不方便回答，可以点击「跳过」按钮。\n\n"
+            "**点击下方输入框，输入任意内容开始访谈！**"
+        )
+        
+        return [[None, welcome]], ""
+    
     def process_message(
         self, 
         user_input: str, 
@@ -84,8 +105,32 @@ class WebInterviewHandler:
         Returns:
             (更新后的历史, 清空输入框的值, 输入框更新)
         """
-        if not self.session or not self.engine:
-            # 会话未初始化
+        # 延迟初始化：第一次用户输入时才真正初始化会话
+        if not self._initialized or not self.session or not self.engine:
+            # 真正初始化
+            self.session, self.engine = create_interview("Web访谈者")
+            self._initialized = True
+            
+            # 获取第一个问题
+            first_question = self.engine.get_current_question()
+            
+            # 更新历史：移除"点击开始"提示，添加第一个问题
+            if history and len(history) > 0:
+                # 保留欢迎消息，替换最后的提示
+                welcome = history[0] if history else [None, "欢迎参加访谈！"]
+                history = [
+                    welcome,
+                    [None, first_question]
+                ]
+            else:
+                history = [[None, first_question]]
+            
+            logger.log_interview(
+                self.session.session_id,
+                "Web访谈开始",
+                {"user": self.session.user_name}
+            )
+            
             return history, "", gr.update()
         
         if self.session.is_finished:
@@ -239,24 +284,23 @@ def create_web_interface():
         
         # 事件处理函数
         def init_handler():
-            """初始化处理器"""
+            """初始化处理器 - 延迟加载模式，快速返回欢迎页面"""
             handler = WebInterviewHandler()
-            history, _ = handler.initialize()
+            history, _ = handler.lazy_initialize()  # 使用延迟初始化
             return handler, history
         
         def respond(user_input, history, handler):
             """处理用户输入"""
             if handler is None:
                 handler = WebInterviewHandler()
-                history, _ = handler.initialize()
             
             new_history, clear_input, input_update = handler.process_message(user_input, history)
             return new_history, clear_input, input_update, handler
         
         def skip_question(history, handler):
             """跳过当前问题"""
-            if handler is None:
-                return history, handler
+            if handler is None or not handler._initialized:
+                return history, handler, gr.update()
             
             # 调用跳过处理
             new_history, clear_input, input_update = handler.process_message("/跳过", history)
@@ -265,7 +309,7 @@ def create_web_interface():
         def new_interview():
             """开始新访谈"""
             handler = WebInterviewHandler()
-            history, _ = handler.initialize()
+            history, _ = handler.lazy_initialize()  # 使用延迟初始化
             return handler, history, gr.update(interactive=True)
         
         # 页面加载时初始化

@@ -102,12 +102,13 @@ class UnifiedAPIClient:
         self.timeout: int = 15
         self.max_retries: int = 3
         self.retry_delay: float = 1.0
+        self._lazy_initialized = False  # 标记是否已延迟初始化
         
-        # 尝试加载已保存的配置
+        # 尝试加载已保存的配置（不验证）
         self._load_config()
     
     def _load_config(self) -> bool:
-        """从本地文件加载API配置"""
+        """从本地文件加载API配置（不进行网络验证）"""
         if not os.path.exists(API_CONFIG_FILE):
             return False
         
@@ -127,6 +128,40 @@ class UnifiedAPIClient:
             logger.warning(f"加载API配置失败：{e}")
         
         return False
+    
+    def _lazy_init_client(self) -> bool:
+        """
+        延迟初始化客户端（首次使用时调用）
+        不进行测试调用，直接创建客户端
+        """
+        if self._lazy_initialized:
+            return self.is_available
+        
+        if not self.current_provider or not self.api_key:
+            return False
+        
+        try:
+            import openai
+            
+            client_kwargs = {
+                "api_key": self.api_key,
+                "base_url": self.current_provider.base_url,
+                "timeout": self.timeout,
+            }
+            
+            if self.current_provider.provider_id == "baidu" and self.secret_key:
+                client_kwargs["default_headers"] = {"X-Bce-Signature-Key": self.secret_key}
+            
+            self.client = openai.OpenAI(**client_kwargs)
+            self.is_available = True
+            self._lazy_initialized = True
+            logger.info(f"延迟初始化API客户端成功：{self.current_provider.name}")
+            return True
+            
+        except Exception as e:
+            logger.warning(f"延迟初始化API客户端失败：{e}")
+            self._lazy_initialized = True  # 标记已尝试
+            return False
     
     def save_config(self) -> bool:
         """保存API配置到本地文件"""
@@ -264,6 +299,10 @@ class UnifiedAPIClient:
         Returns:
             生成的追问问题，失败返回 None
         """
+        # 延迟初始化客户端
+        if not self.is_available and not self._lazy_initialized:
+            self._lazy_init_client()
+        
         if not self.is_available or not self.client:
             return None
         
@@ -275,43 +314,80 @@ class UnifiedAPIClient:
         scene, edu_type = topic_name.split("-") if "-" in topic_name else ("", "")
         original_question = topic.get("questions", [""])[0]
         
-        # 构建对话历史上下文
+        # 构建完整对话历史（用于上下文理解）
         history_context = ""
         if conversation_log:
-            recent_logs = [log for log in conversation_log[-6:] if log.get("topic") == topic_name]
+            recent_logs = [log for log in conversation_log[-8:] if log.get("topic") == topic_name]
             if recent_logs:
                 history_parts = []
-                for log in recent_logs:
+                for i, log in enumerate(recent_logs):
                     q_type = log.get("question_type", "")
+                    q_text = log.get("question", "")
                     ans = log.get("answer", "")
                     if "核心" in q_type:
-                        history_parts.append(f"核心问题回答：{ans}")
+                        history_parts.append(f"[第{i+1}轮] 问：{q_text}\n答：{ans}")
                     elif "追问" in q_type:
-                        history_parts.append(f"追问后补充：{ans}")
+                        history_parts.append(f"[第{i+1}轮-追问] 问：{q_text}\n答：{ans}")
                 if history_parts:
-                    history_context = "\n之前的回答记录：\n" + "\n".join(history_parts)
+                    history_context = "\n\n对话历史：\n" + "\n\n".join(history_parts)
         
-        # 优化后的prompt
-        prompt = f"""你是一位友善的访谈员，正在进行关于大学生五育发展的访谈。
+        # 根据五育维度设置不同的语气风格
+        tone_guide = self._get_tone_by_edu_type(edu_type)
+        
+        # 优化后的prompt - 混合过渡语风格 + 话题自适应语气
+        prompt = f"""你是一位善于倾听的访谈员，正在和大学生进行轻松的访谈对话。
 
-当前话题：{topic_name}
-场景：{scene}  维度：{edu_type}
-原始问题：{original_question}
+【当前话题】{topic_name}
+【场景】{scene}
+【维度】{edu_type}
+【原始问题】{original_question}
 
-用户最新回答：{valid_answer}
+【用户刚才说】
+{valid_answer}
 {history_context}
 
-请生成一个自然、口语化的追问，要求：
-1. 像朋友聊天一样自然，不要太正式
-2. 针对用户回答中提到的具体内容深入追问
-3. 可以追问：具体的细节、当时的感受、遇到的困难、他人的反应、后来的影响等
-4. 不要重复已经问过的内容
-5. 不要使用"能具体说说吗"这类笼统的表述
-6. 追问要与{edu_type}主题相关
+【生成追问的要求】
+1. 语气风格：{tone_guide}
 
-直接输出追问内容，不要有任何前缀或解释。"""
+2. 过渡语风格（混合使用，随机选一种）：
+   - 引用式："你提到XXX，" / "刚才说的XXX挺有意思，"
+   - 共情式："听起来..." / "感觉你对这个..."
+   - 简洁式：直接追问，不加过渡语
+
+3. 追问内容方向（选择最合适的一个）：
+   - 追问具体细节：什么时候、在哪里、和谁一起、怎么做的
+   - 追问内心感受：当时心情、现在回想的感觉
+   - 追问影响变化：后来怎样了、有什么改变、学到什么
+   - 追问他人反应：别人怎么看、有没有得到反馈
+
+4. 禁止事项：
+   - 不要使用"能具体说说吗""能展开讲讲吗"这类空泛表述
+   - 不要重复用户已经详细说过的内容
+   - 不要一次问多个问题
+   - 不要太正式或太书面化
+
+直接输出追问内容（一句话），不要任何前缀、解释或引号。"""
         
         return self._call_with_retry(prompt, topic)
+    
+    def _get_tone_by_edu_type(self, edu_type: str) -> str:
+        """
+        根据五育维度返回对应的语气风格指导
+        
+        Args:
+            edu_type: 五育维度（德育、智育、体育、美育、劳育）
+            
+        Returns:
+            语气风格指导文本
+        """
+        tone_map = {
+            "德育": "温和认真，像在聊人生道理和价值观，可以稍微正式一点。示例语气：'这个选择背后是怎么想的呢？'",
+            "智育": "好奇探索，像在讨论学习方法和知识，带点求知的热情。示例语气：'哇这个方法听起来不错，效果咋样？'",
+            "体育": "活泼轻松，像在聊运动和健康，可以更随意一些。示例语气：'那场比赛紧张不？'",
+            "美育": "感性细腻，像在聊艺术和美的体验，注重感受的表达。示例语气：'当时是什么触动了你？'",
+            "劳育": "朴实接地气，像在聊日常生活和动手经历，很生活化。示例语气：'累不累？值不值？'"
+        }
+        return tone_map.get(edu_type, "自然随和，像朋友聊天一样")
     
     def _call_with_retry(self, prompt: str, topic: dict) -> Optional[str]:
         """
