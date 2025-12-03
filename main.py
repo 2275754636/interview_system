@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 # coding: utf-8
 """
@@ -22,7 +23,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import logger
 from config import ensure_dirs
-from api_client import initialize_api, is_api_available, get_api_client
+from api_client import (
+    initialize_api, is_api_available, get_api_client,
+    get_available_providers, get_current_provider_name, API_PROVIDERS
+)
 from session_manager import get_session_manager
 from interview_engine import create_interview, InterviewEngine
 from web_server import start_web_server, check_gradio_available
@@ -30,47 +34,113 @@ from web_server import start_web_server, check_gradio_available
 
 def setup_api_interactive():
     """
-    交互式配置API密钥
+    交互式配置API - 支持多种大模型API
     """
-    print("\n===== 百度千帆智能追问配置 =====")
+    print("\n===== 智能追问 API 配置 =====")
     
     client = get_api_client()
+    providers = get_available_providers()
     
-    if client.config.access_key and client.config.secret_key:
-        print("1. 已检测到本地保存的密钥，直接回车使用现有密钥")
-        print("2. 若需更新密钥，直接输入新的 Access Key 和 Secret Key")
-    else:
-        print("1. 访问百度千帆官网：https://qianfan.baidubce.com/")
-        print("2. 注册/登录后，进入「控制台」→「API密钥管理」")
-        print("3. 复制「Access Key」和「Secret Key」粘贴到下方")
-        print("   （密钥将自动保存到本地，下次启动无需重复输入）")
+    # 检查是否有已保存的配置
+    if client.current_provider and client.api_key:
+        print(f"已检测到本地保存的配置：{client.current_provider.name}")
+        print(f"模型：{client.model}")
+        use_saved = input("\n是否使用已保存的配置？(Y/n): ").strip().lower()
+        
+        if use_saved != 'n':
+            # 尝试用已保存的配置初始化
+            success = client.initialize(
+                client.current_provider.provider_id,
+                client.api_key,
+                client.secret_key,
+                client.model
+            )
+            if success:
+                print(f"✅ {client.current_provider.name} 智能追问功能已启用")
+                return
+            else:
+                print("⚠️ 已保存的配置无效，请重新配置")
     
+    # 显示可用的 API 提供商
+    print("\n支持的 API 提供商：")
+    print("-" * 50)
+    provider_list = list(providers.keys())
+    for i, (pid, provider) in enumerate(providers.items(), 1):
+        print(f"  {i}. {provider.name}")
+        print(f"     官网：{provider.website}")
+    print(f"  0. 跳过配置（使用预设追问）")
     print("-" * 50)
     
-    # 输入Access Key
-    prompt_ak = "请输入百度千帆 Access Key（直接回车使用已保存）：" if client.config.access_key else "请输入百度千帆 Access Key："
-    new_ak = input(prompt_ak).strip()
+    # 选择提供商
+    while True:
+        choice = input(f"\n请选择 API 提供商 [0-{len(provider_list)}]: ").strip()
+        
+        if choice == '0' or choice == '':
+            print("ℹ️ 跳过API配置，将使用预设追问")
+            return
+        
+        try:
+            idx = int(choice) - 1
+            if 0 <= idx < len(provider_list):
+                selected_id = provider_list[idx]
+                break
+            else:
+                print("无效选择，请重新输入")
+        except ValueError:
+            # 也支持直接输入提供商ID
+            if choice in providers:
+                selected_id = choice
+                break
+            print("无效输入，请输入数字")
     
-    # 输入Secret Key
-    prompt_sk = "请输入百度千帆 Secret Key（直接回车使用已保存）：" if client.config.secret_key else "请输入百度千帆 Secret Key："
-    new_sk = input(prompt_sk).strip()
+    provider = providers[selected_id]
+    print(f"\n已选择：{provider.name}")
+    print(f"获取 API Key：{provider.website}")
+    print("-" * 50)
+    
+    # 输入 API Key
+    api_key = input(f"请输入 {provider.api_key_name}: ").strip()
+    if not api_key:
+        print("ℹ️ 未输入 API Key，将使用预设追问")
+        return
+    
+    # 百度千帆需要额外的 Secret Key
+    secret_key = None
+    if provider.need_secret_key:
+        secret_key = input("请输入 Secret Key: ").strip()
+        if not secret_key:
+            print("ℹ️ 未输入 Secret Key，将使用预设追问")
+            return
+    
+    # 选择模型（可选）
+    model = None
+    if provider.models and len(provider.models) > 1:
+        print(f"\n可用模型：")
+        for i, m in enumerate(provider.models, 1):
+            default_mark = " (默认)" if m == provider.default_model else ""
+            print(f"  {i}. {m}{default_mark}")
+        
+        model_choice = input(f"选择模型 [直接回车使用默认]: ").strip()
+        if model_choice:
+            try:
+                model_idx = int(model_choice) - 1
+                if 0 <= model_idx < len(provider.models):
+                    model = provider.models[model_idx]
+            except ValueError:
+                pass
     
     # 初始化API
-    ak = new_ak or client.config.access_key
-    sk = new_sk or client.config.secret_key
+    print("\n正在验证 API 配置...")
+    success = initialize_api(selected_id, api_key, secret_key, model)
     
-    if ak and sk:
-        success = initialize_api(ak, sk)
-        if success and (new_ak or new_sk):
-            # 保存新密钥
-            client.save_keys(ak, sk)
-        
-        if success:
-            print("✅ 百度千帆智能追问功能已启用")
-        else:
-            print("ℹ️ 将使用预设追问")
+    if success:
+        # 保存配置
+        client.save_config()
+        print(f"✅ {provider.name} 智能追问功能已启用")
+        print(f"   模型：{client.model}")
     else:
-        print("ℹ️ 未输入完整密钥，将使用预设追问")
+        print("❌ API 配置验证失败，请检查密钥是否正确")
+        print("ℹ️ 将使用预设追问")
 
 
 def run_cli_mode():
@@ -151,7 +221,7 @@ def run_cli_mode():
     print(f"- 场景分布：{stats.get('scene_distribution', {})}")
     print(f"- 五育分布：{stats.get('edu_distribution', {})}")
     print(f"- 追问类型分布：{stats.get('followup_distribution', {})}")
-    print(f"- 百度千帆功能启用状态：{'✅ 已启用' if is_api_available() else '❌ 未启用'}")
+    print(f"- 智能追问功能：{'✅ 已启用 (' + get_current_provider_name() + ')' if is_api_available() else '❌ 未启用'}")
     
     # 导出选项
     while True:

@@ -7,30 +7,13 @@
 
 import os
 from dataclasses import dataclass, field
-from typing import Optional
 
 # ----------------------------
 # 路径配置
 # ----------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-KEYS_FILE = os.path.join(BASE_DIR, "baidu_keys.json")
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 EXPORT_DIR = os.path.join(BASE_DIR, "exports")
-
-
-# ----------------------------
-# 百度千帆 API 配置
-# ----------------------------
-@dataclass
-class BaiduAPIConfig:
-    """百度千帆API配置"""
-    base_url: str = "https://qianfan.baidubce.com/v2"
-    model: str = "ernie-3.5-8k"
-    timeout: int = 15
-    max_retries: int = 3
-    retry_delay: float = 1.0  # 重试延迟（秒）
-    access_key: Optional[str] = None
-    secret_key: Optional[str] = None
 
 
 # ----------------------------
@@ -90,7 +73,6 @@ class LogConfig:
 # ----------------------------
 # 默认配置实例
 # ----------------------------
-BAIDU_API_CONFIG = BaiduAPIConfig()
 INTERVIEW_CONFIG = InterviewConfig()
 WEB_CONFIG = WebConfig()
 LOG_CONFIG = LogConfig()

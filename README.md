@@ -189,8 +189,3 @@ main.py
 
 MIT License
 
-## 🙏 致谢
-
-- [百度千帆大模型](https://qianfan.baidubce.com/) - 提供智能追问能力
-- [Gradio](https://gradio.app/) - Web界面框架
-- [OpenAI Python SDK](https://github.com/openai/openai-python) - API调用封装
