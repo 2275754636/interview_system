@@ -29,6 +29,7 @@ class InterviewSession:
     is_followup: bool = False
     current_followup_is_ai: bool = False  # 当前追问是否为AI生成
     current_followup_count: int = 0  # 当前问题的追问次数
+    current_followup_question: str = ""  # 当前追问的问题内容
     selected_topics: List[Dict] = field(default_factory=list)
     conversation_log: List[Dict] = field(default_factory=list)
     

@@ -317,19 +317,22 @@ class UnifiedAPIClient:
         # 构建完整对话历史（用于上下文理解）
         history_context = ""
         if conversation_log:
-            recent_logs = [log for log in conversation_log[-8:] if log.get("topic") == topic_name]
-            if recent_logs:
+            # 只获取当前话题的对话记录
+            topic_logs = [log for log in conversation_log if log.get("topic") == topic_name]
+            if topic_logs:
                 history_parts = []
-                for i, log in enumerate(recent_logs):
+                for log in topic_logs:
                     q_type = log.get("question_type", "")
                     q_text = log.get("question", "")
                     ans = log.get("answer", "")
+                    
                     if "核心" in q_type:
-                        history_parts.append(f"[第{i+1}轮] 问：{q_text}\n答：{ans}")
+                        history_parts.append(f"【核心问题】{q_text}\n【回答】{ans}")
                     elif "追问" in q_type:
-                        history_parts.append(f"[第{i+1}轮-追问] 问：{q_text}\n答：{ans}")
+                        history_parts.append(f"【追问{len(history_parts)}】{q_text}\n【回答】{ans}")
+                
                 if history_parts:
-                    history_context = "\n\n对话历史：\n" + "\n\n".join(history_parts)
+                    history_context = "\n\n【对话历史】\n" + "\n\n".join(history_parts)
         
         # 根据五育维度设置不同的语气风格
         tone_guide = self._get_tone_by_edu_type(edu_type)
@@ -339,25 +342,27 @@ class UnifiedAPIClient:
 
 【访谈主题】{edu_type}（{scene}场景）
 【核心问题】{original_question}
-【受访者回答】{valid_answer}
 {history_context}
 
-【追问策略】
-你的追问必须紧扣"{edu_type}"这一核心主题，从以下角度深入挖掘（选择最合适的一个）：
+【受访者最新回答】
+{valid_answer}
 
-1. 与{edu_type}的关联性：这个经历如何体现或影响了你在{edu_type}方面的发展？
-2. 原因与动机：是什么促使你做出这个选择/采取这个行动？
-3. 影响与改变：这个经历给你带来了什么收获或改变？
+【追问要求】
+你的追问必须围绕上述【核心问题】展开，紧扣"{edu_type}"主题，从以下角度深入（选择最合适的一个）：
+
+1. 与{edu_type}的关联：这个经历如何体现或影响了{edu_type}方面的发展？
+2. 原因与动机：是什么促使做出这个选择或采取这个行动？
+3. 影响与改变：这个经历带来了什么收获或改变？
 
 【语气风格】
 {tone_guide}
 
-【追问规范】
-- 采用记者采访的专业风格，正式但不生硬
-- 问题要具体、有针对性，避免空泛的"能具体说说吗"
-- 每次只问一个问题，聚焦一个点
-- 如果回答偏离主题，温和地将话题引导回{edu_type}相关内容
-- 如果回答中有值得深挖的点，可以适当延伸，但最终要与{edu_type}主题关联
+【重要规范】
+- 追问必须与【核心问题】相关，不要偏离主题
+- 参考【对话历史】避免重复已经问过的内容
+- 如果受访者回答偏题，温和地引导回{edu_type}主题
+- 每次只问一个具体问题，不要空泛地说"能具体说说吗"
+- 采用记者采访的专业风格，正式但亲和
 
 直接输出追问问题，不要任何前缀或解释。"""
         

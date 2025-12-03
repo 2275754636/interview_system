@@ -295,6 +295,7 @@ class InterviewEngine:
                 self.session.is_followup = True
                 self.session.current_followup_is_ai = is_ai  # 保存追问类型
                 self.session.current_followup_count = 1  # 开始第一次追问
+                self.session.current_followup_question = followup_q  # 保存追问问题
                 result.need_followup = True
                 result.followup_question = followup_q
                 result.is_ai_generated = is_ai
@@ -307,11 +308,12 @@ class InterviewEngine:
         else:
             # 处理追问回答
             is_ai_followup = getattr(self.session, 'current_followup_is_ai', False)
+            last_followup_q = getattr(self.session, 'current_followup_question', '（追问）')
             log_entry = {
                 "timestamp": timestamp,
                 "topic": current_topic["name"],
                 "question_type": "追问回答",
-                "question": "（上轮追问）",
+                "question": last_followup_q,  # 使用实际的追问问题
                 "answer": answer.strip() or "用户未补充回答",
                 "depth_score": self.score_depth(answer),
                 "is_ai_generated": is_ai_followup  # 记录是否为AI追问
@@ -330,6 +332,7 @@ class InterviewEngine:
             if need_more_followup:
                 self.session.current_followup_count += 1
                 self.session.current_followup_is_ai = is_ai
+                self.session.current_followup_question = followup_q  # 保存新的追问问题
                 result.need_followup = True
                 result.followup_question = followup_q
                 result.is_ai_generated = is_ai
@@ -339,6 +342,7 @@ class InterviewEngine:
             # 不需要继续追问，进入下一题
             self.session.is_followup = False
             self.session.current_followup_count = 0
+            self.session.current_followup_question = ""  # 清空追问问题
             return self._move_to_next_question(result)
     
     def _move_to_next_question(self, result: QuestionResult) -> QuestionResult:
