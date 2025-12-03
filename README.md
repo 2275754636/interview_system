@@ -1,31 +1,31 @@
 # 🎓 大学生五育并举访谈智能体
 
-基于百度千帆大模型的智能访谈系统，支持多人同时在线访谈。
+基于多种大模型API的智能访谈系统，支持多人同时在线访谈。
 
 ## ✨ 特性
 
-- 🤖 **智能追问**：基于百度千帆大模型，根据回答内容生成针对性追问
+- 🤖 **智能追问**：支持多种大模型API（DeepSeek、OpenAI、通义千问、智谱AI、百度千帆），根据回答内容生成针对性追问
 - 🔄 **API重试机制**：自动重试失败的API调用，支持指数退避策略
 - 👥 **多人同时访谈**：支持多用户同时进行访谈，会话隔离
-- 📊 **实时统计**：展示访谈进度、场景分布、五育覆盖情况
 - 📱 **双模式支持**：命令行交互 + Web扫码访问
 - 📝 **日志系统**：统一的日志输出，支持文件和控制台
-- 💾 **JSON导出**：访谈记录自动保存，支持随时导出
+- 💾 **自动导出**：访谈结束时自动保存JSON日志
 
 ## 📁 项目结构
 
 ```
 interview_system/
 ├── __init__.py          # 包初始化文件
-├── config.py            # 配置文件（API设置、系统参数）
+├── config.py            # 配置文件（系统参数）
 ├── questions.py         # 题目配置（15个访谈话题：3场景×5育）
 ├── logger.py            # 统一日志模块
-├── api_client.py        # API客户端（百度千帆，含重试机制）
+├── api_client.py        # 统一API客户端（支持多种大模型）
 ├── session_manager.py   # 会话管理（支持多人同时访谈）
 ├── interview_engine.py  # 访谈核心引擎（追问逻辑、评分）
 ├── web_server.py        # Web服务模块（Gradio界面）
 ├── main.py              # 主入口文件
 ├── requirements.txt     # 依赖列表
+├── api_config.json      # API配置（自动生成）
 ├── exports/             # 导出的访谈记录
 └── logs/                # 日志文件
 ```
@@ -52,29 +52,43 @@ python main.py
 
 ## 🔧 配置说明
 
-### 百度千帆API配置
+### 支持的 API 提供商
 
-首次运行时，程序会引导你输入百度千帆的 Access Key 和 Secret Key：
+| 提供商 | 默认模型 | 获取API Key |
+|--------|----------|-------------|
+| **DeepSeek** | deepseek-chat | [platform.deepseek.com](https://platform.deepseek.com/) |
+| **OpenAI** | gpt-3.5-turbo | [platform.openai.com](https://platform.openai.com/) |
+| **通义千问** | qwen-turbo | [dashscope.console.aliyun.com](https://dashscope.console.aliyun.com/) |
+| **智谱AI** | glm-4-flash | [open.bigmodel.cn](https://open.bigmodel.cn/) |
+| **百度千帆** | ernie-3.5-8k | [qianfan.baidubce.com](https://qianfan.baidubce.com/) |
 
-1. 访问 [百度千帆官网](https://qianfan.baidubce.com/)
-2. 注册/登录后，进入「控制台」→「API密钥管理」
-3. 复制 Access Key 和 Secret Key
+### API配置流程
 
-密钥会自动保存到本地 `baidu_keys.json`，下次启动无需重复输入。
+首次运行时，程序会引导你选择API提供商并输入密钥：
+
+```
+===== 智能追问 API 配置 =====
+
+支持的 API 提供商：
+--------------------------------------------------
+  1. DeepSeek (深度求索)
+  2. OpenAI (ChatGPT)
+  3. 通义千问 (阿里)
+  4. 智谱AI (GLM)
+  5. 百度千帆 (文心一言)
+  0. 跳过配置（使用预设追问）
+--------------------------------------------------
+
+请选择 API 提供商 [0-5]:
+```
+
+配置成功后会自动保存到 `api_config.json`，下次启动无需重复输入。
 
 ### 修改配置参数
 
 编辑 `config.py` 可调整：
 
 ```python
-# API配置
-BAIDU_API_CONFIG = BaiduAPIConfig(
-    model="ernie-3.5-8k",      # 使用的模型
-    timeout=15,                 # 超时时间（秒）
-    max_retries=3,              # 最大重试次数
-    retry_delay=1.0             # 重试延迟（秒）
-)
-
 # 访谈配置
 INTERVIEW_CONFIG = InterviewConfig(
     total_questions=6,          # 每次访谈题目数
@@ -113,9 +127,10 @@ WEB_CONFIG = WebConfig(
 
 | 操作 | 说明 |
 |------|------|
-| `/跳过` | 跳过当前问题 |
-| 「导出访谈日志」按钮 | 下载JSON日志文件 |
-| 「开始新访谈」按钮 | 重新开始一次访谈 |
+| 「⏭️ 跳过」按钮 | 跳过当前问题 |
+| 「🔄 开始新访谈」按钮 | 重新开始一次访谈 |
+
+> 注：Web模式下访谈结束会自动导出日志到 `exports/` 目录
 
 ## 📊 导出格式
 
@@ -154,8 +169,7 @@ WEB_CONFIG = WebConfig(
 main.py
   ├── config.py (配置)
   ├── logger.py (日志)
-  ├── api_client.py (API调用)
-  │     └── config.py
+  ├── api_client.py (统一API调用)
   ├── session_manager.py (会话管理)
   │     └── config.py
   ├── interview_engine.py (访谈引擎)
@@ -168,6 +182,24 @@ main.py
         ├── session_manager.py
         └── interview_engine.py
 ```
+
+### 添加新的API提供商
+
+编辑 `api_client.py`，在 `API_PROVIDERS` 字典中添加：
+
+```python
+"new_provider": APIProviderConfig(
+    name="新提供商名称",
+    provider_id="new_provider",
+    base_url="https://api.example.com/v1",  # OpenAI兼容格式
+    default_model="model-name",
+    api_key_name="API Key",
+    models=["model-1", "model-2"],
+    website="https://example.com/"
+)
+```
+
+> 注：大多数国产API都兼容OpenAI接口格式，只需修改 base_url 和模型名称即可。
 
 ### 扩展题目
 

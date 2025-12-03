@@ -41,7 +41,7 @@ logs/
 exports/
 
 # API密钥（敏感信息）
-baidu_keys.json
+api_config.json
 
 # 二维码图片
 access_code.png
