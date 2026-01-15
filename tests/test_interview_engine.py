@@ -1,10 +1,11 @@
 import interview_system.core.interview_engine as interview_engine
+import interview_system.integrations.api_helpers as api_helpers
 from interview_system.core.interview_engine import InterviewEngine
 from interview_system.services.session_manager import InterviewSession, get_session_manager
 
 
 def test_select_questions_covers_all_scenes(isolated_runtime, monkeypatch):
-    monkeypatch.setattr(interview_engine, "generate_followup", lambda *_args, **_kwargs: None, raising=True)
+    monkeypatch.setattr(api_helpers, "generate_followup", lambda *_args, **_kwargs: None, raising=True)
 
     session = get_session_manager().create_session("tester")
     engine = InterviewEngine(session)
@@ -17,7 +18,7 @@ def test_select_questions_covers_all_scenes(isolated_runtime, monkeypatch):
 
 
 def test_process_answer_appends_core_log_and_advances_or_followups(isolated_runtime, monkeypatch):
-    monkeypatch.setattr(interview_engine, "generate_followup", lambda *_args, **_kwargs: None, raising=True)
+    monkeypatch.setattr(api_helpers, "generate_followup", lambda *_args, **_kwargs: None, raising=True)
 
     session = get_session_manager().create_session("tester")
     engine = InterviewEngine(session)
@@ -36,7 +37,7 @@ def test_process_answer_appends_core_log_and_advances_or_followups(isolated_runt
 
 
 def test_skip_question_writes_log_and_moves_next(isolated_runtime, monkeypatch):
-    monkeypatch.setattr(interview_engine, "generate_followup", lambda *_args, **_kwargs: None, raising=True)
+    monkeypatch.setattr(api_helpers, "generate_followup", lambda *_args, **_kwargs: None, raising=True)
 
     session = InterviewSession(session_id="s1", user_name="tester")
     # 通过 SessionManager 管理该会话，保证写日志路径一致
@@ -54,7 +55,7 @@ def test_skip_question_writes_log_and_moves_next(isolated_runtime, monkeypatch):
 
 
 def test_skip_round_in_followup_skips_followup_and_moves_next(isolated_runtime, monkeypatch):
-    monkeypatch.setattr(interview_engine, "generate_followup", lambda *_args, **_kwargs: None, raising=True)
+    monkeypatch.setattr(api_helpers, "generate_followup", lambda *_args, **_kwargs: None, raising=True)
 
     sm = get_session_manager()
     session = sm.create_session("tester")

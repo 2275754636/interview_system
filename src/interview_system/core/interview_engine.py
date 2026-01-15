@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # coding: utf-8
 """
-访谈核心模块 - 大学生五育并举访谈智能体
-包含访谈逻辑、追问机制、回答评分等核心功能
+Interview Engine - Orchestrates interview flow
+Delegates answer processing and followup generation
 """
 
 import random
@@ -12,14 +12,16 @@ from typing import List, Dict, Optional, Tuple
 
 import interview_system.common.logger as logger
 from interview_system.common.config import INTERVIEW_CONFIG
+from interview_system.core.answer_processor import AnswerProcessor
+from interview_system.core.followup_generator import FollowupGenerator
 from interview_system.core.questions import TOPICS, SCENES, EDU_TYPES
-from interview_system.integrations.api_client import generate_followup, is_api_available
+from interview_system.integrations.api_helpers import is_api_available
 from interview_system.services.session_manager import InterviewSession, get_session_manager
 
 
 @dataclass
 class QuestionResult:
-    """问题处理结果"""
+    """Question processing result"""
     need_followup: bool = False
     followup_question: str = ""
     is_ai_generated: bool = False
@@ -29,13 +31,14 @@ class QuestionResult:
 
 
 class InterviewEngine:
-    """访谈引擎 - 核心访谈逻辑"""
-    
+    """Interview orchestrator - delegates to processors"""
+
     def __init__(self, session: InterviewSession):
         self.session = session
         self.config = INTERVIEW_CONFIG
-        
-        # 如果会话没有选题，自动选题
+        self.answer_processor = AnswerProcessor()
+        self.followup_generator = FollowupGenerator()
+
         if not session.selected_topics:
             session.selected_topics = self.select_questions()
             get_session_manager().update_session(session)
@@ -119,235 +122,113 @@ class InterviewEngine:
         return f"【第{idx + 1}/{total}题】{topic['name']}:\n{question}"
     
     def get_current_topic(self) -> Optional[Dict]:
-        """获取当前话题"""
+        """Get current topic"""
         idx = self.session.current_question_idx
         if idx < len(self.session.selected_topics):
             return self.session.selected_topics[idx]
         return None
-    
-    def score_depth(self, answer: str) -> int:
-        """
-        评估回答深度
-        
-        Args:
-            answer: 用户回答
-            
-        Returns:
-            深度分数 (0-3)
-        """
-        if not answer:
-            return 0
-        
-        text = answer.lower()
-        score = sum(1 for kw in self.config.depth_keywords if kw in text)
-        return min(score, self.config.max_depth_score)
-    
-    def extract_keywords(self, answer: str) -> List[str]:
-        """
-        提取回答中的关键词
-        
-        Args:
-            answer: 用户回答
-            
-        Returns:
-            提取的关键词列表
-        """
-        if not answer:
-            return []
-        
-        text = answer.lower()
-        return [kw for kw in self.config.common_keywords if kw in text]
-    
-    def should_followup(self, answer: str, topic: Dict) -> Tuple[bool, str, bool]:
-        """
-        判断是否需要追问
-        
-        Args:
-            answer: 用户回答
-            topic: 当前话题
-            
-        Returns:
-            (是否需要追问, 追问问题, 是否AI生成)
-        """
-        valid_answer = answer.strip()
-        depth_score = self.score_depth(valid_answer)
-        followup_count = getattr(self.session, 'current_followup_count', 0)
-        max_followups = self.config.max_followups_per_question
-        
-        # 检查是否已达到最大追问次数
-        if followup_count >= max_followups:
-            logger.log_interview(
-                self.session.session_id,
-                "跳过追问",
-                {"reason": f"已达到最大追问次数({max_followups})", "followup_count": followup_count}
-            )
-            return False, "", False
-        
-        # 情况1：空回答或短回答 - 需要追问
-        if not valid_answer or len(valid_answer) < self.config.min_answer_length:
-            return self._generate_followup_question(valid_answer, topic, force=True)
-        
-        # 情况2：回答深度满分 - 不追问
-        if depth_score >= self.config.max_depth_score:
-            logger.log_interview(
-                self.session.session_id,
-                "跳过追问",
-                {"reason": "回答详细且有深度", "depth_score": depth_score}
-            )
-            return False, "", False
-        
-        # 情况3：回答深度不足 - 尝试AI追问
-        return self._generate_followup_question(valid_answer, topic, force=False)
-    
-    def _generate_followup_question(
-        self, 
-        answer: str, 
-        topic: Dict, 
-        force: bool = False
-    ) -> Tuple[bool, str, bool]:
-        """
-        生成追问问题
-        
-        Args:
-            answer: 用户回答
-            topic: 当前话题
-            force: 是否强制追问（即使AI失败也使用预设追问）
-            
-        Returns:
-            (是否追问, 追问问题, 是否AI生成)
-        """
-        # 尝试AI生成追问
-        ai_followup = generate_followup(answer, topic, self.session.conversation_log)
-        
-        if ai_followup:
-            logger.log_interview(
-                self.session.session_id,
-                "AI追问生成成功",
-                {"question": ai_followup}
-            )
-            return True, ai_followup, True
-        
-        # AI失败时的处理
-        if force:
-            # 强制追问模式：使用预设追问
-            preset = topic.get("followups", ["能再具体说说吗？"])
-            followup = random.choice(preset)
-            logger.log_interview(
-                self.session.session_id,
-                "使用预设追问",
-                {"question": followup}
-            )
-            return True, followup, False
-        
-        # 非强制模式：不追问
-        return False, "", False
-    
+
     def process_answer(self, answer: str) -> QuestionResult:
         """
-        处理用户回答
-        
-        Args:
-            answer: 用户回答
-            
+        Process user answer - delegates to processors
+
         Returns:
-            处理结果
+            Processing result
         """
         result = QuestionResult()
-        
+
         if self.session.is_finished:
             result.is_finished = True
             result.message = "访谈已结束"
             return result
-        
+
         current_topic = self.get_current_topic()
         if not current_topic:
             result.is_finished = True
             result.message = "访谈已结束"
             return result
-        
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
+
         if not self.session.is_followup:
-            # 处理核心问题回答
-            depth = self.score_depth(answer)
-            valid_answer = answer.strip() or "用户未给出有效回答"
-            
-            # 记录回答
-            log_entry = {
-                "timestamp": timestamp,
-                "topic": current_topic["name"],
-                "question_type": "核心问题",
-                "question": current_topic["questions"][0],
-                "answer": valid_answer,
-                "depth_score": depth
-            }
-            self.session.conversation_log.append(log_entry)
-            
-            logger.log_interview(
-                self.session.session_id,
-                "记录核心问题回答",
-                {"topic": current_topic["name"], "depth": depth}
-            )
-            
-            # 判断是否需要追问
-            need_followup, followup_q, is_ai = self.should_followup(answer, current_topic)
-            
-            if need_followup:
-                self.session.is_followup = True
-                self.session.current_followup_is_ai = is_ai  # 保存追问类型
-                self.session.current_followup_count = 1  # 开始第一次追问
-                self.session.current_followup_question = followup_q  # 保存追问问题
-                get_session_manager().update_session(self.session)
-                result.need_followup = True
-                result.followup_question = followup_q
-                result.is_ai_generated = is_ai
-                result.message = "请补充回答"
-                return result
-            
-            # 不需要追问，进入下一题
-            return self._move_to_next_question(result)
-        
-        else:
-            # 处理追问回答
-            is_ai_followup = getattr(self.session, 'current_followup_is_ai', False)
-            last_followup_q = getattr(self.session, 'current_followup_question', '（追问）')
-            log_entry = {
-                "timestamp": timestamp,
-                "topic": current_topic["name"],
-                "question_type": "追问回答",
-                "question": last_followup_q,  # 使用实际的追问问题
-                "answer": answer.strip() or "用户未补充回答",
-                "depth_score": self.score_depth(answer),
-                "is_ai_generated": is_ai_followup  # 记录是否为AI追问
-            }
-            self.session.conversation_log.append(log_entry)
-            
-            logger.log_interview(
-                self.session.session_id,
-                "记录追问回答",
-                {"topic": current_topic["name"], "followup_count": self.session.current_followup_count}
-            )
-            
-            # 判断是否需要继续追问
-            need_more_followup, followup_q, is_ai = self.should_followup(answer, current_topic)
-            
-            if need_more_followup:
-                self.session.current_followup_count += 1
-                self.session.current_followup_is_ai = is_ai
-                self.session.current_followup_question = followup_q  # 保存新的追问问题
-                get_session_manager().update_session(self.session)
-                result.need_followup = True
-                result.followup_question = followup_q
-                result.is_ai_generated = is_ai
-                result.message = "请继续补充"
-                return result
-            
-            # 不需要继续追问，进入下一题
-            self.session.is_followup = False
-            self.session.current_followup_count = 0
-            self.session.current_followup_question = ""  # 清空追问问题
-            self.session.current_followup_is_ai = False
-            return self._move_to_next_question(result)
+            return self._process_core_answer(answer, current_topic, result)
+
+        return self._process_followup_answer(answer, current_topic, result)
+
+    def _process_core_answer(
+        self,
+        answer: str,
+        topic: Dict,
+        result: QuestionResult
+    ) -> QuestionResult:
+        """Process core question answer"""
+        log_entry = self.answer_processor.process_core_answer(
+            self.session, answer, topic
+        )
+        self.session.conversation_log.append(log_entry)
+
+        logger.log_interview(
+            self.session.session_id,
+            "记录核心问题回答",
+            {"topic": topic["name"], "depth": log_entry["depth_score"]}
+        )
+
+        depth = log_entry["depth_score"]
+        need_followup, followup_q, is_ai = self.followup_generator.should_followup(
+            answer, topic, self.session, depth
+        )
+
+        if need_followup:
+            self.session.is_followup = True
+            self.session.current_followup_is_ai = is_ai
+            self.session.current_followup_count = 1
+            self.session.current_followup_question = followup_q
+            get_session_manager().update_session(self.session)
+            result.need_followup = True
+            result.followup_question = followup_q
+            result.is_ai_generated = is_ai
+            result.message = "请补充回答"
+            return result
+
+        return self._move_to_next_question(result)
+
+    def _process_followup_answer(
+        self,
+        answer: str,
+        topic: Dict,
+        result: QuestionResult
+    ) -> QuestionResult:
+        """Process followup answer"""
+        log_entry = self.answer_processor.process_followup_answer(
+            self.session, answer, topic
+        )
+        self.session.conversation_log.append(log_entry)
+
+        logger.log_interview(
+            self.session.session_id,
+            "记录追问回答",
+            {"topic": topic["name"], "followup_count": self.session.current_followup_count}
+        )
+
+        depth = log_entry["depth_score"]
+        need_more_followup, followup_q, is_ai = self.followup_generator.should_followup(
+            answer, topic, self.session, depth
+        )
+
+        if need_more_followup:
+            self.session.current_followup_count += 1
+            self.session.current_followup_is_ai = is_ai
+            self.session.current_followup_question = followup_q
+            get_session_manager().update_session(self.session)
+            result.need_followup = True
+            result.followup_question = followup_q
+            result.is_ai_generated = is_ai
+            result.message = "请继续补充"
+            return result
+
+        self.session.is_followup = False
+        self.session.current_followup_count = 0
+        self.session.current_followup_question = ""
+        self.session.current_followup_is_ai = False
+        return self._move_to_next_question(result)
     
     def _move_to_next_question(self, result: QuestionResult) -> QuestionResult:
         """移动到下一题"""
@@ -422,7 +303,7 @@ class InterviewEngine:
 
         if current_topic:
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            last_followup_q = getattr(self.session, 'current_followup_question', '（追问）')
+            last_followup_q = self.session.current_followup_question or '（追问）'
             log_entry = {
                 "timestamp": timestamp,
                 "topic": current_topic["name"],
@@ -430,7 +311,7 @@ class InterviewEngine:
                 "question": last_followup_q,
                 "answer": "用户选择跳过追问",
                 "depth_score": 0,
-                "is_ai_generated": getattr(self.session, 'current_followup_is_ai', False)
+                "is_ai_generated": self.session.current_followup_is_ai
             }
             get_session_manager().add_conversation_log(self.session.session_id, log_entry)
 

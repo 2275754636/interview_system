@@ -17,7 +17,7 @@
 
 import interview_system.common.logger as logger
 from interview_system.common.config import ensure_dirs
-from interview_system.integrations.api_client import (
+from interview_system.integrations.api_helpers import (
     initialize_api,
     is_api_available,
     get_api_client,

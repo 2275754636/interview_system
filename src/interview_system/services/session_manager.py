@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 # coding: utf-8
 """
-会话管理模块 - 大学生五育并举访谈智能体
-支持多人同时访谈的会话管理，集成数据库持久化
+Session Manager - Core session lifecycle management
+Delegates export and statistics to specialized modules
 """
 
-import json
-import os
 import threading
 import uuid
 from dataclasses import dataclass, field
@@ -14,7 +12,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 
 import interview_system.common.logger as logger
-from interview_system.common.config import WEB_CONFIG, EXPORT_DIR, ensure_dirs
+from interview_system.common.config import WEB_CONFIG, ensure_dirs
 
 # 尝试导入数据库模块（可选依赖）
 try:
@@ -81,20 +79,20 @@ class InterviewSession:
 
 
 class SessionManager:
-    """会话管理器 - 支持多人同时访谈"""
-    
+    """Session manager - supports concurrent interviews"""
+
     _instance = None
     _lock = threading.Lock()
-    
+
     def __new__(cls):
-        """单例模式"""
+        """Singleton pattern"""
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
                     cls._instance = super().__new__(cls)
                     cls._instance._initialized = False
         return cls._instance
-    
+
     def __init__(self):
         if self._initialized:
             return
@@ -104,8 +102,14 @@ class SessionManager:
         self._max_sessions = WEB_CONFIG.max_sessions
         self._initialized = True
 
-        # 初始化数据库（如果可用）
         self._db = get_database() if DATABASE_AVAILABLE else None
+
+        # Lazy import to avoid circular dependency
+        from interview_system.services.session_exporter import SessionExporter
+        from interview_system.services.session_statistics import SessionStatistics
+
+        self._exporter = SessionExporter(self)
+        self._statistics = SessionStatistics(self)
 
         ensure_dirs()
         db_status = "已启用" if self._db else "未启用"
@@ -360,77 +364,13 @@ class SessionManager:
     
     def export_session(self, session_id: str, file_path: str = None) -> Optional[str]:
         """
-        导出会话到JSON文件
-        
-        Args:
-            session_id: 会话ID
-            file_path: 导出路径（可选）
-            
+        Export session to JSON file
+
         Returns:
-            导出的文件路径，失败返回 None
+            File path on success, None on failure
         """
-        session = self.get_session(session_id)
-        if not session:
-            logger.warning(f"导出失败：会话 {session_id} 不存在")
-            return None
-        
-        # 生成统计信息
-        summary = self._generate_summary(session)
-        
-        # 确定文件路径
-        if not file_path:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            file_path = os.path.join(
-                EXPORT_DIR, 
-                f"interview_{session.user_name}_{timestamp}.json"
-            )
-        
-        # 导出到文件
-        try:
-            with open(file_path, "w", encoding="utf-8") as f:
-                json.dump(summary, f, ensure_ascii=False, indent=2)
-            
-            logger.log_session(session_id, "导出会话", f"文件: {file_path}")
-            return file_path
-        except Exception as e:
-            logger.error(f"导出会话失败: {e}")
-            return None
-    
-    def _generate_summary(self, session: InterviewSession) -> dict:
-        """生成会话摘要"""
-        # 统计场景分布
-        scene_stats = {}
-        edu_stats = {}
-        followup_stats = {"预设追问": 0, "AI智能追问": 0}
-        
-        for log in session.conversation_log:
-            topic = log.get("topic", "")
-            if "-" in topic:
-                scene, edu = topic.split("-")
-                scene_stats[scene] = scene_stats.get(scene, 0) + 1
-                edu_stats[edu] = edu_stats.get(edu, 0) + 1
-            
-            q_type = log.get("question_type", "")
-            if "追问" in q_type:
-                if log.get("is_ai_generated"):
-                    followup_stats["AI智能追问"] += 1
-                else:
-                    followup_stats["预设追问"] += 1
-        
-        return {
-            "session_id": session.session_id,
-            "user_name": session.user_name,
-            "start_time": session.start_time,
-            "end_time": session.end_time or datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "statistics": {
-                "total_logs": len(session.conversation_log),
-                "scene_distribution": scene_stats,
-                "edu_distribution": edu_stats,
-                "followup_distribution": followup_stats
-            },
-            "conversation_log": session.conversation_log
-        }
-    
+        return self._exporter.export_session(session_id, file_path)
+
     def _cleanup_expired_sessions(self):
         """清理过期会话"""
         timeout = WEB_CONFIG.session_timeout
@@ -453,7 +393,7 @@ class SessionManager:
         """移除最旧的会话"""
         if not self._sessions:
             return
-        
+
         oldest_sid = min(
             self._sessions.keys(),
             key=lambda x: self._sessions[x].start_time
@@ -461,56 +401,17 @@ class SessionManager:
         del self._sessions[oldest_sid]
         logger.log_session(oldest_sid, "移除最旧会话")
 
-    # ========== 统计分析方法 ==========
-
     def get_statistics(self, start_date: str = None, end_date: str = None) -> Dict:
-        """
-        获取统计数据
-
-        Args:
-            start_date: 开始日期 (YYYY-MM-DD)
-            end_date: 结束日期 (YYYY-MM-DD)
-
-        Returns:
-            统计数据字典
-        """
-        if self._db:
-            return self._db.get_statistics_by_date_range(start_date, end_date)
-        else:
-            # 从内存会话计算统计（简化版）
-            total = len(self._sessions)
-            finished = sum(1 for s in self._sessions.values() if s.is_finished)
-            return {
-                'total_sessions': total,
-                'finished_sessions': finished,
-                'completion_rate': round(finished / total * 100, 1) if total > 0 else 0,
-                'scene_distribution': {},
-                'edu_distribution': {},
-                'followup_distribution': {},
-                'avg_depth_score': 0
-            }
+        """Get statistics - delegates to SessionStatistics"""
+        return self._statistics.get_statistics(start_date, end_date)
 
     def get_daily_statistics(self, days: int = 7) -> List[Dict]:
-        """
-        获取最近N天的每日统计
-
-        Args:
-            days: 天数
-
-        Returns:
-            每日统计数据列表
-        """
-        if self._db:
-            return self._db.get_daily_statistics(days)
-        else:
-            return []
+        """Get daily statistics - delegates to SessionStatistics"""
+        return self._statistics.get_daily_statistics(days)
 
     def get_session_count(self) -> int:
-        """获取总会话数"""
-        if self._db:
-            return self._db.get_session_count()
-        else:
-            return len(self._sessions)
+        """Get total session count - delegates to SessionStatistics"""
+        return self._statistics.get_session_count()
 
 
 # ----------------------------

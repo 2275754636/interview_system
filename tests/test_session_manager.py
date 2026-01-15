@@ -56,10 +56,10 @@ def test_get_session_loads_from_database_when_not_in_memory(isolated_runtime):
 
 
 def test_rollback_session_restores_logs_and_state(isolated_runtime, monkeypatch):
-    import interview_system.core.interview_engine as interview_engine
+    import interview_system.integrations.api_helpers as api_helpers
     from interview_system.core.interview_engine import InterviewEngine
 
-    monkeypatch.setattr(interview_engine, "generate_followup", lambda *_args, **_kwargs: None, raising=True)
+    monkeypatch.setattr(api_helpers, "generate_followup", lambda *_args, **_kwargs: None, raising=True)
 
     sm = get_session_manager()
     session = sm.create_session("tester")

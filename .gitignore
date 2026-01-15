@@ -1,225 +1,67 @@
-# ============================================
-# Python 编译文件
-# ============================================
+# Python
 __pycache__/
 *.py[cod]
-*$py.class
 *.so
 *.pyd
-*.pyo
-
-# ============================================
-# Python 分发 / 打包
-# ============================================
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-pip-wheel-metadata/
-share/python-wheels/
 *.egg-info/
-.installed.cfg
 *.egg
-MANIFEST
+dist/
+build/
+.eggs/
 
-# ============================================
-# 虚拟环境
-# ============================================
+# Virtual Environment
 venv/
-ENV/
-env/
 .venv/
+env/
 .env/
-env.bak/
-venv.bak/
-pythonenv*/
 
-# ============================================
-# IDE 和编辑器配置
-# ============================================
-# PyCharm
+# IDE
 .idea/
-*.iml
-*.iws
-.idea_modules/
-
-# VS Code
 .vscode/
-*.code-workspace
-
-# Sublime Text
-*.sublime-project
-*.sublime-workspace
-
-# Vim
 *.swp
 *.swo
 *~
-.*.sw[a-z]
-*.un~
-Session.vim
 
-# Emacs
-*~
-\#*\#
-.\#*
-.projectile
-
-# Eclipse
-.project
-.pydevproject
-.settings/
-
-# ============================================
-# 操作系统文件
-# ============================================
-# macOS
+# OS
 .DS_Store
-.AppleDouble
-.LSOverride
-._*
-
-# Windows
 Thumbs.db
-Thumbs.db:encryptable
-ehthumbs.db
-ehthumbs_vista.db
 Desktop.ini
-$RECYCLE.BIN/
 
-# Linux
-.directory
-.Trash-*
-
-# ============================================
-# 项目特定 - 运行时生成文件
-# ============================================
-# 日志文件
+# Project Runtime
 logs/
 *.log
-
-# 导出文件
 exports/
-*.json.backup
-
-# 数据库文件
 interview_data.db
-interview_data.db-journal
-interview_data.db-wal
-interview_data.db-shm
-
-# 二维码图片
+interview_data.db-*
 access_code.png
 qr_code_*.png
-
-# HTML报告
 reports/
-exports/*.html
 
-# ============================================
-# 项目特定 - 敏感信息
-# ============================================
-# API配置（包含密钥）
+# Secrets
 api_config.json
-settings.local.json
 .env
 .env.local
-.env.*.local
-config.local.py
 secrets.json
 
-# ============================================
-# 测试相关
-# ============================================
-# pytest
+# Testing
 .pytest_cache/
-.cache/
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-
-# 测试覆盖率
-htmlcov/
 .coverage
-.coverage.*
+htmlcov/
 .hypothesis/
 
-# Jupyter Notebook
-.ipynb_checkpoints/
-*.ipynb
-
-# ============================================
-# 代码质量工具
-# ============================================
-# mypy
+# Type Checking
 .mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Pyre
-.pyre/
-
-# pytype
-.pytype/
-
-# ruff
 .ruff_cache/
 
-# tox/nox
-.tox/
-.nox/
-
-# Cython debug
-cython_debug/
-
-# ============================================
-# 文档构建
-# ============================================
+# Docs Build
 docs/_build/
-docs/_static/
-docs/_templates/
 site/
 
-# ============================================
-# 备份和临时文件
-# ============================================
+# Temp
 *.bak
 *.tmp
-*.temp
-*~
-.~*
 *.orig
 
-# ============================================
-# Claude Code 配置（可选忽略）
-# ============================================
-.claude/
-.spec-workflow/
-
-# ============================================
-# 项目特定 - 本地知识库（不入库）
-# ============================================
+# Local
 helloagents/
-
-
-# ============================================
-# 其他
-# ============================================
-# 压缩文件（如果不需要提交）
-*.zip
-*.tar.gz
-*.rar
-*.7z
-
-# 大文件标记
-*.large
+llmdoc/
