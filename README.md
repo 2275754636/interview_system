@@ -5,28 +5,15 @@
 **AI-Powered Interview Platform for Holistic Education Assessment**
 
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![React](https://img.shields.io/badge/react-19.2-61dafb.svg)](https://react.dev/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/status-active-success.svg)]()
 
-[Quick Start](#quick-start) • [Features](#features) • [Documentation](#documentation) • [Configuration](#configuration)
+[Quick Start](#quick-start) | [Features](#features) | [Architecture](#architecture) | [Configuration](#configuration)
 
 **English** | [中文](README_zh.md)
 
 </div>
-
----
-
-## Table of Contents
-
-- [Features](#features)
-- [Quick Start](#quick-start)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Usage](#usage)
-- [API Providers](#api-providers)
-- [Project Structure](#project-structure)
-- [Development](#development)
-- [License](#license)
 
 ---
 
@@ -41,17 +28,17 @@
 - Dynamic follow-up questions (max 3 per question)
 - Context-aware AI responses
 - Multi-user concurrent sessions
-- CLI + Web interface
 
 </td>
 <td width="50%">
 
-**v2.0 Enhancements**
-- SQLite persistence
-- Plotly visualization
-- Admin dashboard
-- Real-time statistics
-- HTML report generation
+**v3.0 Modern UI**
+- React 19 + TypeScript + ShadcnUI
+- Bento Grid layout
+- Dark mode support
+- Command Palette (Ctrl+K)
+- Glassmorphism effects
+- Micro-interactions
 
 </td>
 </tr>
@@ -63,321 +50,184 @@
 
 ### Prerequisites
 
-- **Python**: 3.10+ (3.10, 3.11, 3.12, 3.13 supported)
+- **Python**: 3.10+
+- **Node.js**: 18+ (for frontend)
 - **OS**: Windows 10/11, macOS, Linux
 
-### Check Python Version
-
-```bash
-python --version  # Must be 3.10+
-```
-
-### Install & Run
+### Backend Setup
 
 ```bash
 # Clone repository
 git clone https://github.com/username/interview_system.git
 cd interview_system
 
-# Create virtual environment (recommended)
+# Create virtual environment
 python -m venv venv
 venv\Scripts\activate      # Windows
 source venv/bin/activate   # Linux/macOS
 
-# Install in editable mode (required)
-pip install -e .
+# Install backend
+pip install -e ".[api]"
 
-# Run (choose one)
-interview          # Interactive mode selector
-interview-web      # Direct web mode
-interview-admin    # Admin dashboard
+# Start API server
+uvicorn interview_system.api.main:app --reload --port 8000
+```
+
+### Frontend Setup
+
+```bash
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start dev server
+npm run dev
+```
+
+**Access:**
+- Frontend: http://localhost:5173
+- API Docs: http://localhost:8000/docs
+
+---
+
+## Architecture
+
+```
+interview_system/
+├── src/interview_system/
+│   ├── api/                  # FastAPI REST API
+│   │   ├── main.py           # App entry
+│   │   ├── routes/           # Endpoints
+│   │   └── schemas/          # Pydantic models
+│   ├── core/                 # Business logic
+│   ├── services/             # Session management
+│   ├── data/                 # Database layer
+│   └── integrations/         # LLM providers
+├── frontend/                 # React SPA
+│   ├── src/
+│   │   ├── components/       # UI components
+│   │   │   ├── chat/         # Chatbot, MessageBubble
+│   │   │   ├── layout/       # Layout, Header, Sidebar
+│   │   │   └── common/       # ThemeProvider, CommandPalette
+│   │   ├── stores/           # Zustand state
+│   │   ├── hooks/            # TanStack Query hooks
+│   │   ├── services/         # API client
+│   │   └── types/            # TypeScript types
+│   └── package.json
+└── llmdoc/                   # LLM documentation
 ```
 
 ---
 
-## Installation
+## Tech Stack
 
-<details>
-<summary><b>Dependency Conflicts</b></summary>
+### Frontend
 
-Use locked versions if conflicts occur:
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| React | 19.2 | UI framework |
+| TypeScript | 5.9 | Type safety |
+| Vite | 7.3 | Build tool |
+| ShadcnUI | latest | Component library |
+| Tailwind CSS | 3.4 | Styling |
+| Zustand | 5.0 | State management |
+| TanStack Query | 5.90 | Data fetching |
 
-```bash
-pip install -r requirements-lock.txt
-```
+### Backend
 
-</details>
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| Python | 3.10+ | Runtime |
+| FastAPI | 0.110+ | REST API |
+| SQLite | - | Database |
+| Pydantic | 2.0+ | Validation |
 
-### Testing
+---
 
-```bash
-pip install -e ".[dev]"
-pytest -q
-```
+## API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/session/start` | Create session |
+| GET | `/api/session/{id}` | Get session |
+| POST | `/api/session/{id}/message` | Send message |
+| POST | `/api/session/{id}/undo` | Undo exchange |
+| POST | `/api/session/{id}/skip` | Skip question |
+| POST | `/api/session/{id}/restart` | Reset session |
+| GET | `/api/session/{id}/stats` | Get statistics |
 
 ---
 
 ## Configuration
 
-### API Providers
-
-| Provider | Model | API Key |
-|----------|-------|---------|
-| **DeepSeek** | `deepseek-chat` | [platform.deepseek.com](https://platform.deepseek.com/) |
-| **OpenAI** | `gpt-3.5-turbo` | [platform.openai.com](https://platform.openai.com/) |
-| **Qwen** | `qwen-turbo` | [dashscope.console.aliyun.com](https://dashscope.console.aliyun.com/) |
-| **GLM** | `glm-4-flash` | [open.bigmodel.cn](https://open.bigmodel.cn/) |
-| **ERNIE** | `ernie-3.5-8k` | [qianfan.baidubce.com](https://qianfan.baidubce.com/) |
-
-> Use `deepseek-chat`. R1 is for math/logic only.
-
 ### Environment Variables
 
-Copy `.env.example` to `.env`:
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env`:
-
 ```ini
-# API Configuration
+# Backend (.env)
 API_PROVIDER=deepseek
 API_KEY=your_api_key_here
 API_MODEL=deepseek-chat
 
-# Web Server
-WEB_HOST=127.0.0.1
-WEB_PORT=7860
-WEB_SHARE=false
+# Frontend (.env)
+VITE_API_URL=http://localhost:8000/api
 ```
 
-**Priority**: Environment variables > `.env` file > `api_config.json` (deprecated)
+### API Providers
 
-### Security
-
-- **Never commit** `.env` or `api_config.json`
-- Use system environment variables in production
-- Rotate API keys regularly
-- `.gitignore` excludes sensitive files by default
-
-<details>
-<summary><b>Custom Configuration</b></summary>
-
-Edit `src/interview_system/common/config.py`:
-
-```python
-INTERVIEW_CONFIG = InterviewConfig(
-    total_questions=6,              # Questions per interview
-    min_answer_length=15,           # Min length to trigger follow-up
-    max_followups_per_question=3,   # Max follow-ups per question
-    max_depth_score=4               # Max depth score (stops follow-ups)
-)
-
-WEB_CONFIG = WebConfig(
-    host="127.0.0.1",
-    port=7860,
-    share=False,
-    max_sessions=100
-)
-```
-
-</details>
-
----
-
-## Usage
-
-### Run Modes
-
-```bash
-interview  # Select mode after launch
-```
-
-Select mode:
-- `1`: CLI interactive mode
-- `2`: Web mode (default) - QR code for mobile access
-- `3`: Admin dashboard
-
-### Admin Dashboard
-
-```bash
-# Method 1: Select mode 3 at startup
-interview
-
-# Method 2: Direct launch
-interview-admin
-
-# Method 3: Windows script
-scripts\start_admin.bat
-```
-
-**Access**: `http://localhost:7861`
-
-**Features**:
-- Overview dashboard (total interviews, completion rate, trends)
-- Session list (view all interviews and details)
-- Statistical analysis (visualizations, distributions)
-- Data export (JSON batch export, HTML reports)
-- Detail view (complete conversation logs)
-
-### Commands
-
-**CLI Mode**:
-| Command | Action |
-|---------|--------|
-| `跳过` | Skip current question |
-| `导出` | Export interview log |
-| `结束` | End interview |
-
-**Web Mode**:
-| Button | Action |
-|--------|--------|
-| 跳过 | Skip current question |
-| 开始新访谈 | Start new interview |
-
-> Auto-exports to `exports/` on completion
-
----
-
-## Data & Reports
-
-### Export Format
-
-```json
-{
-  "session_id": "abc12345",
-  "user_name": "Interviewee",
-  "start_time": "2025-12-03 10:00:00",
-  "end_time": "2025-12-03 10:30:00",
-  "statistics": {
-    "total_logs": 8,
-    "completion_rate": 100,
-    "scene_distribution": {"学校": 3, "家庭": 2, "社区": 3},
-    "edu_distribution": {"德育": 2, "智育": 1, "体育": 2, "美育": 1, "劳育": 2},
-    "followup_distribution": {"预设追问": 1, "AI智能追问": 2}
-  },
-  "conversation_log": [
-    {
-      "timestamp": "2025-12-03 10:05:00",
-      "topic": "学校-德育",
-      "question_type": "核心问题",
-      "question": "你认为自己在大学里学习到的最重要的品德是什么？",
-      "answer": "...",
-      "depth_score": 2
-    }
-  ]
-}
-```
-
-### Visualization
-
-Built-in Plotly charts:
-- Pie charts: Scene/education distribution
-- Bar charts: Follow-up type statistics
-- Line charts: Interview volume trends
-- Dashboards: Comprehensive statistics
-
-### HTML Reports
-
-Generate visual reports from admin dashboard:
-- Beautiful chart displays
-- Complete statistics
-- Browser-ready
-- Shareable
-
----
-
-## Project Structure
-
-```
-interview_system/
-├── src/
-│   └── interview_system/      # Core implementation (src-layout)
-│       ├── app/               # Application layer
-│       ├── ui/                # User interfaces
-│       ├── core/              # Business logic
-│       ├── services/          # Services
-│       ├── data/              # Data layer
-│       ├── integrations/      # External APIs
-│       ├── reports/           # Reporting & visualization
-│       └── common/            # Shared utilities
-├── docs/                      # Documentation
-│   ├── QUICKSTART.md
-│   └── INSTALL_TEST.md
-├── exports/                   # Exported interviews (auto-generated)
-├── logs/                      # Log files (auto-generated)
-├── pyproject.toml             # Project configuration (PEP 517/518)
-├── requirements-lock.txt      # Locked versions
-├── .env.example               # Environment template
-└── interview_data.db          # SQLite database (auto-generated)
-```
+| Provider | Model | Website |
+|----------|-------|---------|
+| DeepSeek | `deepseek-chat` | [platform.deepseek.com](https://platform.deepseek.com/) |
+| OpenAI | `gpt-3.5-turbo` | [platform.openai.com](https://platform.openai.com/) |
+| Qwen | `qwen-turbo` | [dashscope.console.aliyun.com](https://dashscope.console.aliyun.com/) |
+| GLM | `glm-4-flash` | [open.bigmodel.cn](https://open.bigmodel.cn/) |
+| ERNIE | `ernie-3.5-8k` | [qianfan.baidubce.com](https://qianfan.baidubce.com/) |
 
 ---
 
 ## Development
 
-### Module Dependencies
+### Run Tests
 
-```
-interview (CLI entry point)
-  └── src/interview_system/app/main.py
-        ├── ui/web_ui.py (Web interface)
-        ├── ui/admin_ui.py (Admin dashboard)
-        ├── core/interview_engine.py
-        │     ├── core/questions.py
-        │     ├── integrations/api_client.py
-        │     └── services/session_manager.py
-        │           └── data/database.py
-        └── common/config.py + common/logger.py
+```bash
+# Frontend tests
+cd frontend && npm test
+
+# Backend tests
+pytest -q
 ```
 
-### Add API Provider
+### Build Production
 
-Edit `src/interview_system/integrations/api_client.py`:
+```bash
+# Frontend
+cd frontend && npm run build
 
-```python
-"new_provider": APIProviderConfig(
-    name="Provider Name",
-    provider_id="new_provider",
-    base_url="https://api.example.com/v1",  # OpenAI-compatible
-    default_model="model-name",
-    api_key_name="API Key",
-    models=["model-1", "model-2"],
-    website="https://example.com/"
-)
+# Output: frontend/dist/
 ```
 
-### Extend Questions
+---
 
-Edit `src/interview_system/core/questions.py`:
+## Design System
 
-```python
-{
-    "name": "场景-育类型",
-    "scene": "场景",            # 学校/家庭/社区
-    "edu_type": "育类型",       # 德育/智育/体育/美育/劳育
-    "intro": "话题介绍",
-    "questions": ["核心问题"],
-    "scenarios": [],            # Optional
-    "followups": ["预设追问1", "预设追问2"]
-}
-```
+### Colors
 
-### Interview Rules
+| Token | Light | Dark |
+|-------|-------|------|
+| Background | `#F5F7FA` | `#0F172A` |
+| Card | `#FFFFFF` | `#1E293B` |
+| Primary | `#7C3AED` | `#7C3AED` |
+| Muted | `#64748B` | `#94A3B8` |
 
-- **Questions**: 6 random questions per interview
-- **Coverage**: Ensures 3 scenes (学校/家庭/社区) + 5 education types (德智体美劳)
-- **Follow-up Logic**:
-  - Answer too short (<15 chars): Auto follow-up
-  - Insufficient depth: AI follow-up
-  - Max 3 follow-ups per question
-  - Depth score ≥4: Skip to next question
-- **AI Follow-up**:
-  - Context-aware (uses answer history)
-  - Topic-relevant
-  - Conversational tone
+### Spacing
+
+8px grid system: `4px`, `8px`, `16px`, `24px`, `32px`
+
+### Effects
+
+- Card shadow: `0 1px 3px rgba(0,0,0,0.05)`
+- Glassmorphism: `backdrop-filter: blur(10px)`
+- Hover lift: `transform: translateY(-2px)`
 
 ---
 
@@ -389,13 +239,4 @@ MIT License
 
 ## Contributing
 
-Contributions welcome. Follow existing code style (Hemingway principles: terse, high-signal).
-
----
-
-## Documentation
-
-- [Quick Start Guide](docs/QUICKSTART.md)
-- [Installation & Testing](docs/INSTALL_TEST.md)
-
----
+Contributions welcome.

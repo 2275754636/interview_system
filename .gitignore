@@ -26,6 +26,8 @@ env/
 .DS_Store
 Thumbs.db
 Desktop.ini
+nul
+NUL
 
 # Project Runtime
 logs/

@@ -39,11 +39,17 @@ dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
 ]
+api = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.27.0",
+    "pydantic>=2.0.0",
+]
 
 [project.scripts]
 interview = "interview_system.app.main:main"
 interview-web = "interview_system.app.main:run_web"
 interview-admin = "interview_system.app.admin:main"
+interview-api = "interview_system.api.run:main"
 
 [project.urls]
 Homepage = "https://github.com/username/interview_system"

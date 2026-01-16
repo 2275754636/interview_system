@@ -38,6 +38,7 @@ class InterviewSession:
     current_followup_question: str = ""
     selected_topics: List[Dict] = field(default_factory=list)
     conversation_log: List[Dict] = field(default_factory=list)
+    undo_stack: List[Dict] = field(default_factory=list)
 
     def __post_init__(self):
         if not self.start_time:
@@ -240,6 +241,22 @@ class SessionManager:
                 logger.log_session(session_id, "移除会话")
                 return True
         return False
+
+    def delete_session(self, session_id: str) -> bool:
+        """Delete session permanently (memory + database when available)"""
+        with self._session_lock:
+            ok = True
+
+            if self._db:
+                ok = bool(self._db.delete_session(session_id))
+
+            if session_id in self._sessions:
+                del self._sessions[session_id]
+
+            if ok:
+                logger.log_session(session_id, "删除会话")
+
+            return ok
     
     def get_active_session_count(self) -> int:
         """Get active session count"""
