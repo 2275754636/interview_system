@@ -7,6 +7,7 @@ Interview System 统一启动脚本
 import subprocess
 import sys
 import os
+import json
 import time
 import signal
 import re
@@ -34,6 +35,43 @@ def log(step: int, total: int, msg: str, status: str = ""):
         print(f"{prefix} {msg}...", end=" ", flush=True)
     else:
         print(f"{prefix} {msg}")
+
+
+PUBLIC_URL_STATE_FILE = ROOT_DIR / ".public_url_state.json"
+
+
+def write_public_url_state(url: str | None, is_public: bool) -> None:
+    """写入前端公网 URL 状态文件（后端从该文件读取）。"""
+    try:
+        PUBLIC_URL_STATE_FILE.write_text(
+            json.dumps({"url": url, "is_public": is_public}, ensure_ascii=False),
+            encoding="utf-8",
+        )
+    except Exception as e:
+        import traceback
+        print(f"警告: 写入公网 URL 状态失败: {e}")
+        traceback.print_exc()
+
+
+def print_ascii_qrcode(url: str) -> None:
+    """在终端输出 ASCII 二维码（依赖 qrcode）。"""
+    try:
+        import qrcode
+
+        qr = qrcode.QRCode(border=2)
+        qr.add_data(url)
+        qr.make(fit=True)
+        matrix = qr.get_matrix()
+
+        print()
+        print("  扫码打开前端公网地址:")
+        for row in matrix:
+            print("  " + "".join("██" if cell else "  " for cell in row))
+        print(f"\n  {url}\n")
+    except Exception as e:
+        import traceback
+        print(f"警告: 终端二维码输出失败: {e}")
+        traceback.print_exc()
 
 
 def check_python() -> bool:
@@ -88,7 +126,7 @@ def install_frontend_deps() -> bool:
     return result.returncode == 0
 
 
-def start_backend() -> subprocess.Popen | None:
+def start_backend(*, enable_public: bool) -> subprocess.Popen | None:
     """启动后端服务"""
     log(3, 4, "启动后端服务", "wait")
     try:
@@ -100,6 +138,12 @@ def start_backend() -> subprocess.Popen | None:
             if existing_pythonpath
             else src_dir
         )
+        env["PUBLIC_URL_STATE_PATH"] = str(PUBLIC_URL_STATE_FILE)
+        if enable_public:
+            env.setdefault(
+                "CORS_ALLOWED_HOST_SUFFIXES",
+                ".trycloudflare.com,.ngrok-free.app,.ngrok.io",
+            )
 
         proc = subprocess.Popen(
             [
@@ -129,14 +173,21 @@ def start_backend() -> subprocess.Popen | None:
         return None
 
 
-def start_frontend() -> subprocess.Popen | None:
+def start_frontend(*, enable_public: bool) -> subprocess.Popen | None:
     """启动前端服务"""
     log(4, 4, "启动前端服务", "wait")
     try:
+        env = os.environ.copy()
+        if enable_public:
+            env.setdefault(
+                "VITE_ALLOWED_HOSTS",
+                ".trycloudflare.com,.ngrok-free.app,.ngrok.io",
+            )
         proc = subprocess.Popen(
             ["npm", "run", "dev"],
             cwd=FRONTEND_DIR,
             shell=True,
+            env=env,
         )
         time.sleep(3)
         if proc.poll() is None:
@@ -164,7 +215,7 @@ def check_tunnel_binary() -> str | None:
 
 
 def install_cloudflared() -> bool:
-    """自动安装 cloudflared (Windows: winget, macOS: brew, Linux: 下载二进制)"""
+    """自动安装 cloudflared（优先使用系统包管理器；不再提供直接下载二进制的 fallback）。"""
     import platform
 
     system = platform.system()
@@ -190,41 +241,11 @@ def install_cloudflared() -> bool:
             print("    cloudflared 安装成功 ✓")
             return True
 
-        # winget 失败，尝试直接下载
-        print("    winget 安装失败，尝试直接下载...")
-        import urllib.request
-        import zipfile
-        import tempfile
-
-        url = "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.zip"
-        try:
-            with tempfile.TemporaryDirectory() as tmpdir:
-                zip_path = Path(tmpdir) / "cloudflared.zip"
-                urllib.request.urlretrieve(url, zip_path)
-
-                with zipfile.ZipFile(zip_path, "r") as zf:
-                    zf.extractall(tmpdir)
-
-                # 移动到用户目录
-                exe_src = Path(tmpdir) / "cloudflared.exe"
-                exe_dst = Path.home() / ".local" / "bin" / "cloudflared.exe"
-                exe_dst.parent.mkdir(parents=True, exist_ok=True)
-
-                import shutil
-
-                shutil.copy2(exe_src, exe_dst)
-
-                # 添加到 PATH (当前会话)
-                os.environ["PATH"] = (
-                    str(exe_dst.parent) + os.pathsep + os.environ.get("PATH", "")
-                )
-
-                print(f"    cloudflared 已安装到 {exe_dst} ✓")
-                print(f"    提示: 建议将 {exe_dst.parent} 添加到系统 PATH")
-                return True
-        except Exception as e:
-            print(f"    下载安装失败: {e}")
-            return False
+        print("    winget 安装失败，请手动安装 cloudflared 后重试。")
+        print(
+            "    参考: https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/"
+        )
+        return False
 
     elif system == "Darwin":  # macOS
         result = subprocess.run(["brew", "install", "cloudflared"], capture_output=True)
@@ -235,22 +256,11 @@ def install_cloudflared() -> bool:
         return False
 
     else:  # Linux
-        import urllib.request
-
-        url = "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64"
-        try:
-            exe_dst = Path.home() / ".local" / "bin" / "cloudflared"
-            exe_dst.parent.mkdir(parents=True, exist_ok=True)
-            urllib.request.urlretrieve(url, exe_dst)
-            exe_dst.chmod(0o755)
-            os.environ["PATH"] = (
-                str(exe_dst.parent) + os.pathsep + os.environ.get("PATH", "")
-            )
-            print(f"    cloudflared 已安装到 {exe_dst} ✓")
-            return True
-        except Exception as e:
-            print(f"    下载安装失败: {e}")
-            return False
+        print("    Linux 请通过发行版包管理器或官方安装文档安装 cloudflared 后重试。")
+        print(
+            "    参考: https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/"
+        )
+        return False
 
     return False
 
@@ -357,16 +367,16 @@ def ensure_env_files():
         shutil.copy2(backend_example, backend_env)
         print("    已创建后端 .env 文件 (从 .env.example 复制)")
 
-    # 前端 .env
-    frontend_env = FRONTEND_DIR / ".env"
+    # 前端 .env.local（避免污染/误提交 .env）
+    frontend_env = FRONTEND_DIR / ".env.local"
     if not frontend_env.exists():
         frontend_env.write_text(f"VITE_API_URL=http://localhost:{BACKEND_PORT}/api\n")
-        print("    已创建前端 .env 文件")
+        print("    已创建前端 .env.local 文件")
 
 
 def update_frontend_api_url(backend_url: str):
     """更新前端 API URL 配置"""
-    frontend_env = FRONTEND_DIR / ".env"
+    frontend_env = FRONTEND_DIR / ".env.local"
     api_url = f"{backend_url}/api"
 
     # 读取现有内容
@@ -402,6 +412,9 @@ def main():
     print("=" * 50)
     print()
 
+    # 防止上次公网 URL 残留（即使未启用 --public 也会写入 false 状态）
+    write_public_url_state(url=None, is_public=False)
+
     # 注册信号处理
     signal.signal(signal.SIGINT, cleanup)
     signal.signal(signal.SIGTERM, cleanup)
@@ -435,7 +448,7 @@ def main():
     print()
 
     # 启动服务
-    backend = start_backend()
+    backend = start_backend(enable_public=args.public)
     if not backend:
         sys.exit(1)
     processes.append(backend)
@@ -455,7 +468,7 @@ def main():
             print("    注意: 前端将使用公网后端 API")
 
     # 启动前端
-    frontend = start_frontend()
+    frontend = start_frontend(enable_public=args.public)
     if not frontend:
         cleanup()
         sys.exit(1)
@@ -466,6 +479,10 @@ def main():
         public_frontend = start_tunnel(FRONTEND_PORT, "前端")
         if public_frontend:
             frontend_url = public_frontend
+
+    # 公网模式: 写入前端公网 URL 状态（供前端弹窗/后端端点读取）
+    if args.public and frontend_url.startswith("https://"):
+        write_public_url_state(url=frontend_url, is_public=True)
 
     # 完成
     print()
@@ -478,6 +495,10 @@ def main():
     print()
     print("  按 Ctrl+C 停止所有服务")
     print("=" * 50)
+
+    # 公网模式: 在最终输出块后输出 ASCII 二维码（终端可扫码）
+    if args.public and frontend_url.startswith("https://"):
+        print_ascii_qrcode(frontend_url)
 
     # 保持运行
     try:

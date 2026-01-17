@@ -25,16 +25,14 @@ describe("Header", () => {
 
     render(<Header title="Title" onCommandOpen={handleCommandOpen} />);
 
-    const button = screen.getByRole("button");
+    const button = screen.getByRole("button", { name: /ctrl\+k/i });
     await user.click(button);
 
     expect(handleCommandOpen).toHaveBeenCalledTimes(1);
   });
 
-  it("applies glassmorphism styles", () => {
-    const { container } = render(<Header title="Title" />);
-    const header = container.querySelector("header");
-
-    expect(header).toHaveClass("backdrop-blur");
+  it("renders share button", () => {
+    render(<Header title="Title" />);
+    expect(screen.getByRole("button", { name: /分享/i })).toBeInTheDocument();
   });
 });

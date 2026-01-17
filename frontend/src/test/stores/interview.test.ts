@@ -25,10 +25,10 @@ describe('InterviewStore', () => {
     const session: Session = {
       id: 'test-session',
       status: 'active',
-      current_question: 1,
-      total_questions: 5,
-      created_at: Date.now(),
-      user_name: '访谈者_test-session',
+      currentQuestion: 1,
+      totalQuestions: 5,
+      createdAt: Date.now(),
+      userName: '访谈者_test-session',
     };
 
     useInterviewStore.getState().setSession(session);

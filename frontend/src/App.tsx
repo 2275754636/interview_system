@@ -1,10 +1,10 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/lib/query';
 import { ThemeProvider } from '@/components/common/ThemeProvider';
-import { CommandPalette } from '@/components/common/CommandPalette';
 import { Header } from '@/components/layout/Header';
 import { Sidebar } from '@/components/layout/Sidebar';
-import { Chatbot, StatsSkeleton } from '@/components/chat';
+import { StatsSkeleton } from '@/components/chat/StatsSkeleton';
+import { LazyChatbot, LazyCommandPalette } from '@/lib/lazy';
 import { useInterviewStore, useCommandStore, useThemeStore } from '@/stores';
 import { useStartSession, useSendMessage, useUndo, useSkip, useSessionStats } from '@/hooks';
 
@@ -38,12 +38,14 @@ function InterviewApp() {
       }
 
       sendMessage.mutate({ sessionId: session.id, text: trimmed });
-    } catch {}
+    } catch (err: unknown) {
+      console.error('[App] 发送消息失败:', err instanceof Error ? err.message : String(err));
+    }
   };
 
   return (
     <>
-      <CommandPalette
+      <LazyCommandPalette
         isOpen={isOpen}
         onOpenChange={(open) => (open ? toggle() : close())}
         commands={commands}
@@ -75,8 +77,8 @@ function InterviewApp() {
                 <div className="rounded-xl bg-card p-4 shadow-card card-interactive scale-in">
                   <h3 className="mb-2 font-semibold">实时统计</h3>
                   <div className="space-y-1 text-sm">
-                    <p>总消息: {stats.total_messages}</p>
-                    <p>平均响应: {stats.average_response_time.toFixed(1)}s</p>
+                    <p>总消息: {stats.totalMessages}</p>
+                    <p>平均响应: {stats.averageResponseTime.toFixed(1)}s</p>
                   </div>
                 </div>
               )}
@@ -85,7 +87,7 @@ function InterviewApp() {
 
           <main className="flex-1 p-4">
             <div className="mx-auto h-[calc(100vh-8rem)] max-w-4xl">
-              <Chatbot
+              <LazyChatbot
                 messages={messages}
                 onSend={handleSend}
                 onUndo={() => session && undo.mutate({ sessionId: session.id })}

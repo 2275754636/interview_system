@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { sessionApi } from '@/services/api';
 import { useInterviewStore } from '@/stores';
 import type { Message } from '@/types';
+import { createClientId } from '@/lib/ids';
+import { STATS_REFETCH_INTERVAL_MS, STATS_STALE_TIME_MS } from '@/lib/query';
 
 export function useStartSession() {
   const { setSession, setMessages, setLoading } = useInterviewStore();
@@ -22,12 +24,8 @@ export function useStartSession() {
 type SendMessageVariables = { sessionId: string; text: string };
 
 function createUserMessage(content: string): Message {
-  const uuid =
-    typeof crypto !== 'undefined' && 'randomUUID' in crypto
-      ? crypto.randomUUID()
-      : `${Date.now()}_${Math.random().toString(16).slice(2)}`;
   return {
-    id: `user_${uuid}`,
+    id: createClientId('user_'),
     role: 'user',
     content,
     timestamp: Date.now(),
@@ -74,6 +72,7 @@ export function useSessionStats(sessionId: string | null) {
     queryKey: ['session', sessionId, 'stats'],
     queryFn: () => sessionApi.getStats(sessionId!),
     enabled: !!sessionId,
-    refetchInterval: 5000,
+    staleTime: STATS_STALE_TIME_MS,
+    refetchInterval: STATS_REFETCH_INTERVAL_MS,
   });
 }

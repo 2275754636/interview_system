@@ -35,9 +35,11 @@ logs/
 exports/
 interview_data.db
 interview_data.db-*
+.public_url_state.json
 access_code.png
 qr_code_*.png
 reports/
+audit-report-*.md
 
 # Secrets
 api_config.json

@@ -11,10 +11,10 @@ vi.mock('@/services/api', () => ({
         session: {
           id: 'test-session',
           status: 'active',
-          current_question: 0,
-          total_questions: 6,
-          created_at: Date.now(),
-          user_name: '访谈者_test-session',
+          currentQuestion: 0,
+          totalQuestions: 6,
+          createdAt: Date.now(),
+          userName: '访谈者_test-session',
         },
         messages: [],
       })
@@ -28,11 +28,11 @@ vi.mock('@/services/api', () => ({
     ),
     getStats: vi.fn(() =>
       Promise.resolve({
-        total_messages: 0,
-        user_messages: 0,
-        assistant_messages: 0,
-        average_response_time: 0,
-        duration_seconds: 0,
+        totalMessages: 0,
+        userMessages: 0,
+        assistantMessages: 0,
+        averageResponseTime: 0,
+        durationSeconds: 0,
       })
     ),
   },
@@ -61,10 +61,10 @@ describe('App', () => {
     expect(screen.getByText(/输入回答后按 Enter 发送/)).toBeInTheDocument();
   });
 
-  it('renders chatbot component', () => {
+  it('renders chatbot component', async () => {
     render(<App />, { wrapper: TestWrapper });
 
-    expect(screen.getByPlaceholderText('输入消息...')).toBeInTheDocument();
+    expect(await screen.findByPlaceholderText('输入消息...')).toBeInTheDocument();
   });
 
   it('renders command palette trigger', () => {
@@ -73,11 +73,11 @@ describe('App', () => {
     expect(screen.getByText('Ctrl+K')).toBeInTheDocument();
   });
 
-  it('renders action bar buttons', () => {
+  it('renders action bar buttons', async () => {
     render(<App />, { wrapper: TestWrapper });
 
-    expect(screen.getByText('撤回')).toBeInTheDocument();
-    expect(screen.getByText('跳过')).toBeInTheDocument();
-    expect(screen.getByText('重新开始')).toBeInTheDocument();
+    expect(await screen.findByText('撤回')).toBeInTheDocument();
+    expect(await screen.findByText('跳过')).toBeInTheDocument();
+    expect(await screen.findByText('重新开始')).toBeInTheDocument();
   });
 });

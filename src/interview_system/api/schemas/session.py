@@ -1,16 +1,41 @@
 """Session schemas"""
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional, List, Literal
+
+from interview_system.api.schemas.message import MessageResponse
 
 
 class SessionCreate(BaseModel):
     user_name: Optional[str] = Field(
-        None, description="用户显示名", examples=["访谈者_001"]
+        None, min_length=1, description="用户显示名", examples=["访谈者_001"]
     )
     topics: Optional[List[str]] = Field(
-        None, description="指定话题名称列表（可选）", examples=[["学校-德育"]]
+        None,
+        min_length=1,
+        description="指定话题名称列表（可选）",
+        examples=[["学校-德育"]],
     )
+
+    @field_validator("user_name")
+    @classmethod
+    def _validate_user_name(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        v = v.strip()
+        if not v:
+            raise ValueError("user_name 不能为空")
+        return v
+
+    @field_validator("topics")
+    @classmethod
+    def _validate_topics(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        if v is None:
+            return None
+        cleaned = [t.strip() for t in v if isinstance(t, str) and t.strip()]
+        if not cleaned:
+            raise ValueError("topics 不能为空")
+        return cleaned
 
 
 class SessionResponse(BaseModel):
@@ -33,6 +58,13 @@ class SessionResponse(BaseModel):
     total_questions: int = Field(..., description="总题数")
     created_at: int = Field(..., description="创建时间（毫秒时间戳）")
     user_name: str = Field(..., description="用户显示名")
+
+
+class StartSessionResponse(BaseModel):
+    """启动会话响应（包含首批 messages，减少一次额外 RTT）。"""
+
+    session: SessionResponse
+    messages: List[MessageResponse]
 
 
 class SessionStats(BaseModel):

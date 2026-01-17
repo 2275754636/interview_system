@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+import tempfile
+from pathlib import Path
 from uuid import UUID
 
 from fastapi.testclient import TestClient
@@ -24,11 +27,14 @@ def test_api_session_flow_and_errors():
         r = client.post("/api/session/start", json={})
         assert r.status_code == 200
         payload = r.json()
-        assert payload["status"] == "active"
-        session_id = payload["id"]
+        assert payload["session"]["status"] == "active"
+        session_id = payload["session"]["id"]
 
         # uuid 格式
         UUID(session_id)
+
+        start_messages = payload["messages"]
+        assert start_messages and start_messages[-1]["role"] == "assistant"
 
         msgs = client.get(f"/api/session/{session_id}/messages")
         assert msgs.status_code == 200
@@ -61,3 +67,37 @@ def test_api_session_flow_and_errors():
         not_found = client.get(f"/api/session/{session_id}")
         assert not_found.status_code == 404
         assert not_found.json()["error"]["code"] == "SESSION_NOT_FOUND"
+
+
+def test_api_public_url_endpoint(monkeypatch):
+    monkeypatch.delenv("PUBLIC_URL_STATE_PATH", raising=False)
+
+    app = create_app(
+        Settings(
+            database_url="sqlite+aiosqlite:///:memory:",
+            log_level="INFO",
+            allowed_origins=[],
+        )
+    )
+
+    with TestClient(app) as client:
+        r1 = client.get("/api/public-url")
+        assert r1.status_code == 200
+        assert r1.json() == {"url": None, "is_public": False}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            state_path = Path(tmp) / "public_url.json"
+            state_path.write_text(
+                json.dumps(
+                    {"url": "https://example.trycloudflare.com", "is_public": True}
+                ),
+                encoding="utf-8",
+            )
+
+            monkeypatch.setenv("PUBLIC_URL_STATE_PATH", str(state_path))
+            r2 = client.get("/api/public-url")
+            assert r2.status_code == 200
+            assert r2.json() == {
+                "url": "https://example.trycloudflare.com",
+                "is_public": True,
+            }

@@ -38,10 +38,10 @@ describe('useStartSession', () => {
     const mockSession = {
       id: 'session-1',
       status: 'active' as const,
-      current_question: 0,
-      total_questions: 10,
-      created_at: Date.now(),
-      user_name: '访谈者_session-1',
+      currentQuestion: 0,
+      totalQuestions: 10,
+      createdAt: Date.now(),
+      userName: '访谈者_session-1',
     };
     const mockMessages = [
       { id: 'msg-1', role: 'assistant' as const, content: 'Q1', timestamp: Date.now() },
@@ -67,10 +67,10 @@ describe('useStartSession', () => {
     const mockSession = {
       id: 'session-1',
       status: 'active' as const,
-      current_question: 0,
-      total_questions: 10,
-      created_at: Date.now(),
-      user_name: '访谈者_session-1',
+      currentQuestion: 0,
+      totalQuestions: 10,
+      createdAt: Date.now(),
+      userName: '访谈者_session-1',
     };
     const mockMessages = [
       { id: 'msg-1', role: 'assistant' as const, content: 'Q1', timestamp: Date.now() },
@@ -182,11 +182,11 @@ describe('useSessionStats', () => {
 
   it('fetches stats when sessionId is provided', async () => {
     const mockStats = {
-      total_messages: 10,
-      user_messages: 5,
-      assistant_messages: 5,
-      average_response_time: 1.2,
-      duration_seconds: 60,
+      totalMessages: 10,
+      userMessages: 5,
+      assistantMessages: 5,
+      averageResponseTime: 1.2,
+      durationSeconds: 60,
     };
 
     vi.mocked(sessionApi.getStats).mockResolvedValueOnce(mockStats);

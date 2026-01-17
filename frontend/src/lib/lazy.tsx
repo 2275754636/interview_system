@@ -1,7 +1,16 @@
-import { lazy, Suspense, type ComponentType } from 'react';
+/* eslint-disable react-refresh/only-export-components */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import {
+  lazy,
+  Suspense,
+  type ComponentProps,
+  type ComponentType,
+  type LazyExoticComponent,
+  type ReactNode,
+} from 'react';
 
 interface LazyComponentProps {
-  fallback?: React.ReactNode;
+  fallback?: ReactNode;
 }
 
 function DefaultFallback() {
@@ -12,16 +21,22 @@ function DefaultFallback() {
   );
 }
 
-export function lazyLoad<T extends ComponentType<unknown>>(
-  importFn: () => Promise<{ default: T }>,
-  fallback?: React.ReactNode
+export function lazyLoad<TComponent extends ComponentType<any>>(
+  importFn: () => Promise<{ default: TComponent }>,
+  fallback?: ReactNode
 ) {
-  const LazyComponent = lazy(importFn);
+  type AnyComponent = ComponentType<any>;
+  type Props = ComponentProps<TComponent>;
 
-  return function LazyWrapper(props: React.ComponentProps<T> & LazyComponentProps) {
+  const LazyComponent = lazy(
+    importFn as unknown as () => Promise<{ default: AnyComponent }>
+  ) as unknown as LazyExoticComponent<TComponent>;
+
+  return function LazyWrapper(props: LazyComponentProps & Props) {
+    const { fallback: fallbackProp, ...rest } = props as LazyComponentProps & Props;
     return (
-      <Suspense fallback={fallback ?? props.fallback ?? <DefaultFallback />}>
-        <LazyComponent {...props} />
+      <Suspense fallback={fallbackProp ?? fallback ?? <DefaultFallback />}>
+        <LazyComponent {...(rest as Props)} />
       </Suspense>
     );
   };
@@ -32,5 +47,8 @@ export const LazyChatbot = lazyLoad(
 );
 
 export const LazyCommandPalette = lazyLoad(
-  () => import('@/components/common/CommandPalette').then((m) => ({ default: m.CommandPalette }))
+  () =>
+    import('@/components/common/CommandPalette').then((m) => ({
+      default: m.CommandPalette,
+    }))
 );
