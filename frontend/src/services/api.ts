@@ -168,7 +168,7 @@ async function request<TResponse, TBody = unknown>(
 }
 
 export const sessionApi = {
-  start: (topics?: string[]) =>
+  start: (topics?: string[]): Promise<StartSessionResult> =>
     request<ApiStartSessionResult, { topics?: string[] }>('/session/start', {
       method: 'POST',
       body: { topics },

@@ -7,6 +7,7 @@ Unified API Client - Multi-provider LLM support
 import json
 import os
 import time
+from pathlib import Path
 from typing import Optional
 
 import interview_system.common.logger as logger
@@ -22,6 +23,13 @@ ENV_FILE = os.path.join(BASE_DIR, ".env")
 # Token limits
 MAX_FOLLOWUP_TOKENS = 120
 TEST_CALL_TOKENS = 5
+
+
+def _write_text_atomic(path: str, content: str) -> None:
+    target = Path(path)
+    tmp = target.with_suffix(target.suffix + ".tmp")
+    tmp.write_text(content, encoding="utf-8")
+    tmp.replace(target)
 
 
 def migrate_json_to_env() -> bool:
@@ -44,12 +52,11 @@ def migrate_json_to_env() -> bool:
         if data.get("secret_key"):
             env_lines.append(f"API_SECRET_KEY={data.get('secret_key', '')}")
 
-        with open(ENV_FILE, "w", encoding="utf-8") as f:
-            f.write("\n".join(env_lines) + "\n")
+        _write_text_atomic(ENV_FILE, "\n".join(env_lines) + "\n")
 
         # Backup old file
         backup_path = API_CONFIG_FILE + ".bak"
-        os.rename(API_CONFIG_FILE, backup_path)
+        Path(API_CONFIG_FILE).replace(Path(backup_path))
         logger.info(f"已迁移配置到 .env，原文件备份为 {backup_path}")
         return True
     except Exception as e:
@@ -178,8 +185,7 @@ class UnifiedAPIClient:
             if self.current_provider.need_secret_key and self.secret_key:
                 env_lines.append(f"API_SECRET_KEY={self.secret_key}")
 
-            with open(ENV_FILE, "w", encoding="utf-8") as f:
-                f.write("\n".join(env_lines) + "\n")
+            _write_text_atomic(ENV_FILE, "\n".join(env_lines) + "\n")
 
             logger.info(f"API配置已保存到：{ENV_FILE}")
             return True
@@ -209,8 +215,7 @@ class UnifiedAPIClient:
                             )
                         )
                     ]
-                with open(ENV_FILE, "w", encoding="utf-8") as f:
-                    f.writelines(lines)
+                _write_text_atomic(ENV_FILE, "".join(lines))
             except Exception as e:
                 logger.warning(f"清除.env中API配置失败: {e}")
 

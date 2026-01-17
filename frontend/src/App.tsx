@@ -1,10 +1,10 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/lib/query';
 import { ThemeProvider } from '@/components/common/ThemeProvider';
-import { CommandPalette } from '@/components/common/CommandPalette';
 import { Header } from '@/components/layout/Header';
 import { Sidebar } from '@/components/layout/Sidebar';
-import { Chatbot, StatsSkeleton } from '@/components/chat';
+import { StatsSkeleton } from '@/components/chat/StatsSkeleton';
+import { LazyChatbot, LazyCommandPalette } from '@/lib/lazy';
 import { useInterviewStore, useCommandStore, useThemeStore } from '@/stores';
 import { useStartSession, useSendMessage, useUndo, useSkip, useSessionStats } from '@/hooks';
 
@@ -45,7 +45,7 @@ function InterviewApp() {
 
   return (
     <>
-      <CommandPalette
+      <LazyCommandPalette
         isOpen={isOpen}
         onOpenChange={(open) => (open ? toggle() : close())}
         commands={commands}
@@ -87,7 +87,7 @@ function InterviewApp() {
 
           <main className="flex-1 p-4">
             <div className="mx-auto h-[calc(100vh-8rem)] max-w-4xl">
-              <Chatbot
+              <LazyChatbot
                 messages={messages}
                 onSend={handleSend}
                 onUndo={() => session && undo.mutate({ sessionId: session.id })}

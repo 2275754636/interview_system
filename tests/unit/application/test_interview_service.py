@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
+import time
+
 import pytest
 
 from interview_system.application.services.interview_service import InterviewService
+from interview_system.domain.services.answer_processor import AnswerProcessor
+from interview_system.domain.services.followup_generator import FollowupGenerator
 
 
 @pytest.mark.asyncio
@@ -53,3 +58,43 @@ async def test_interview_service_undo_and_restart(
     await interview_service.restart(session_id=session.id)
     messages2 = await interview_service.get_messages(session.id)
     assert len(messages2) == 1
+
+
+class SlowLLM:
+    def generate_followup(self, answer: str, topic: dict, conversation_log=None):  # type: ignore[override]
+        time.sleep(0.2)
+        return None
+
+
+@pytest.mark.asyncio
+async def test_interview_service_followup_generation_does_not_block_event_loop(
+    fake_repo, topics_source
+):
+    processor = AnswerProcessor(
+        depth_keywords=["具体"], common_keywords=[], max_depth_score=4
+    )
+    followup = FollowupGenerator(
+        llm=SlowLLM(), min_answer_length=10, max_followups_per_question=3, max_depth_score=4
+    )
+    service = InterviewService(
+        repository=fake_repo,  # type: ignore[arg-type]
+        answer_processor=processor,
+        followup_generator=followup,
+        topics_source=topics_source,
+        total_questions=2,
+    )
+
+    session = await service.start_session(user_name="tester", topics=None)
+
+    tick = asyncio.Event()
+
+    async def ticker() -> None:
+        await asyncio.sleep(0.02)
+        tick.set()
+
+    ticker_task = asyncio.create_task(ticker())
+    process_task = asyncio.create_task(service.process_answer(session_id=session.id, answer="短"))
+
+    await asyncio.wait_for(tick.wait(), timeout=0.1)
+    await process_task
+    await ticker_task

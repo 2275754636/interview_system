@@ -61,10 +61,10 @@ describe('App', () => {
     expect(screen.getByText(/输入回答后按 Enter 发送/)).toBeInTheDocument();
   });
 
-  it('renders chatbot component', () => {
+  it('renders chatbot component', async () => {
     render(<App />, { wrapper: TestWrapper });
 
-    expect(screen.getByPlaceholderText('输入消息...')).toBeInTheDocument();
+    expect(await screen.findByPlaceholderText('输入消息...')).toBeInTheDocument();
   });
 
   it('renders command palette trigger', () => {
@@ -73,11 +73,11 @@ describe('App', () => {
     expect(screen.getByText('Ctrl+K')).toBeInTheDocument();
   });
 
-  it('renders action bar buttons', () => {
+  it('renders action bar buttons', async () => {
     render(<App />, { wrapper: TestWrapper });
 
-    expect(screen.getByText('撤回')).toBeInTheDocument();
-    expect(screen.getByText('跳过')).toBeInTheDocument();
-    expect(screen.getByText('重新开始')).toBeInTheDocument();
+    expect(await screen.findByText('撤回')).toBeInTheDocument();
+    expect(await screen.findByText('跳过')).toBeInTheDocument();
+    expect(await screen.findByText('重新开始')).toBeInTheDocument();
   });
 });

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
@@ -273,7 +274,8 @@ class InterviewService:
         )
         await self._repository.append_conversation_entry(session.id, entry)
 
-        followup = self._followup_generator.should_followup(
+        followup = await asyncio.to_thread(
+            self._followup_generator.should_followup,
             answer=result.answer,
             topic=topic,
             conversation_log=None,
@@ -333,7 +335,8 @@ class InterviewService:
         )
         await self._repository.append_conversation_entry(session.id, entry)
 
-        followup = self._followup_generator.should_followup(
+        followup = await asyncio.to_thread(
+            self._followup_generator.should_followup,
             answer=result.answer,
             topic=topic,
             conversation_log=None,
