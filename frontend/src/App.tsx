@@ -38,7 +38,9 @@ function InterviewApp() {
       }
 
       sendMessage.mutate({ sessionId: session.id, text: trimmed });
-    } catch {}
+    } catch (err: unknown) {
+      console.error('[App] 发送消息失败:', err instanceof Error ? err.message : String(err));
+    }
   };
 
   return (

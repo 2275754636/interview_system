@@ -34,3 +34,22 @@ export interface StartSessionResult {
   session: Session;
   messages: Message[];
 }
+
+export enum ErrorCode {
+  SESSION_NOT_FOUND = 'SESSION_NOT_FOUND',
+  SESSION_COMPLETED = 'SESSION_COMPLETED',
+  NO_MESSAGES_TO_UNDO = 'NO_MESSAGES_TO_UNDO',
+  INVALID_INPUT = 'INVALID_INPUT',
+  INTERNAL_ERROR = 'INTERNAL_ERROR',
+}
+
+export interface ErrorDetail {
+  code: ErrorCode;
+  message: string;
+  details?: Record<string, unknown>;
+}
+
+export interface ErrorResponse {
+  error: ErrorDetail;
+}
+

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -16,12 +17,23 @@ from interview_system.infrastructure.cache.memory_cache import SessionCache
 from interview_system.infrastructure.database.connection import AsyncDatabase
 
 
+def _parse_cors_origins() -> list[str]:
+    """从环境变量解析 CORS origin，fallback 为本地开发地址。"""
+    env_origins = os.getenv("CORS_ORIGINS", "")
+    return [o.strip() for o in env_origins.split(",") if o.strip()] or [
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:3000",
+    ]
+
+
 def create_app(settings: Settings) -> FastAPI:
     """创建 FastAPI app（允许测试时传入不同 Settings）。"""
     configure_logging(log_level=settings.log_level)
 
     @asynccontextmanager
-    async def lifespan(app: FastAPI):  # noqa: ANN001
+    async def lifespan(app: FastAPI):  # type: ignore[misc]
         app.state.settings = settings
         app.state.session_cache = SessionCache()
         app.state.db = AsyncDatabase(settings.database_url)
@@ -38,15 +50,9 @@ def create_app(settings: Settings) -> FastAPI:
 
     register_exception_handlers(app)
 
-    default_origins = [
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:3000",
-    ]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=default_origins + list(settings.allowed_origins),
+        allow_origins=_parse_cors_origins() + list(settings.allowed_origins),
         allow_origin_regex=r"https://.*\.(trycloudflare\.com|ngrok-free\.app|ngrok\.io)",
         allow_credentials=True,
         allow_methods=["*"],
@@ -58,7 +64,8 @@ def create_app(settings: Settings) -> FastAPI:
     app.include_router(health.router)
 
     @app.get("/")
-    async def root():  # noqa: D401
+    async def root():
+        """返回 API 根信息。"""
         return {
             "service": "Interview System API",
             "version": "2.0.0",

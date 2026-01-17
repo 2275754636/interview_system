@@ -1,6 +1,18 @@
-import type { Message, Session, SessionStats, StartSessionResult } from '@/types';
+import type { Message, Session, SessionStats, StartSessionResult, ErrorResponse, ErrorCode } from '@/types';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+
+export class ApiError extends Error {
+  constructor(
+    public code: ErrorCode,
+    public detail: string,
+    public statusCode: number,
+    public details?: Record<string, unknown>
+  ) {
+    super(detail);
+    this.name = 'ApiError';
+  }
+}
 
 interface ApiConfig {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
@@ -19,7 +31,15 @@ async function request<T>(endpoint: string, config?: ApiConfig): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new Error(`API Error: ${response.status}`);
+    const errorData: ErrorResponse = await response.json().catch(() => ({
+      error: { code: 'INTERNAL_ERROR' as ErrorCode, message: `HTTP ${response.status}` },
+    }));
+    throw new ApiError(
+      errorData.error.code,
+      errorData.error.message,
+      response.status,
+      errorData.error.details
+    );
   }
 
   return response.json();
