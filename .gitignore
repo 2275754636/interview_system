@@ -72,6 +72,7 @@ llmdoc/
 .claude/
 plan/
 .ccb_config/
+docs/
 
 # Gradio
 .gradio/
