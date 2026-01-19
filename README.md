@@ -69,6 +69,7 @@ Auto-detects environment, installs dependencies, starts all services.
 - Frontend: http://localhost:5173
 - Backend API: http://localhost:8000
 - API Docs: http://localhost:8000/docs
+- Admin Dashboard: http://localhost:5173/#admin/overview (requires `ADMIN_TOKEN`)
 
 Press `Ctrl+C` to stop all services.
 
@@ -178,6 +179,17 @@ interview_system/
 | GET | `/api/session/{id}/stats` | Get statistics |
 | DELETE | `/api/session/{id}` | Delete session |
 
+### Admin (Supervision Dashboard)
+
+Protected by `ADMIN_TOKEN` (request header `X-Admin-Token`). If `ADMIN_TOKEN` is empty, admin endpoints return `404`.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/admin/overview` | Metrics + time series |
+| GET | `/api/admin/sessions` | Session list (filters + pagination) |
+| GET | `/api/admin/search` | Search conversation logs |
+| GET | `/api/admin/export` | Export CSV/JSON/XLSX |
+
 ---
 
 ## Configuration
@@ -192,6 +204,7 @@ API_MODEL=deepseek-chat
 DATABASE_URL=sqlite+aiosqlite:///./interview_data.db
 LOG_LEVEL=INFO
 ALLOWED_ORIGINS=http://localhost:5173
+ADMIN_TOKEN=change_me  # enables /api/admin/*
 
 # Frontend (.env)
 VITE_API_URL=http://localhost:8000/api

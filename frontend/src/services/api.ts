@@ -7,6 +7,9 @@ import type {
   PublicUrlResponse,
   ErrorResponse,
   ErrorCode as ErrorCodeType,
+  AdminOverviewResponse,
+  AdminListResponse,
+  AdminSearchRow,
 } from '@/types';
 import { logError } from '@/services/logger';
 
@@ -35,6 +38,53 @@ type ApiStartSessionResult = {
 type ApiPublicUrlResponse = {
   url: string | null;
   is_public: boolean;
+};
+
+type ApiAdminOverviewResponse = {
+  summary: {
+    total_sessions: number;
+    total_messages: number;
+    active_users: number;
+    avg_depth_score: number;
+  };
+  time_series: Array<{
+    bucket: string;
+    sessions: number;
+    messages: number;
+    unique_users: number;
+    avg_depth_score: number;
+  }>;
+  top_users: Array<{
+    user_name: string;
+    sessions: number;
+    messages: number;
+  }>;
+  top_topics: Array<{
+    topic: string;
+    messages: number;
+    avg_depth_score: number;
+  }>;
+};
+
+type ApiAdminListResponse = {
+  total: number;
+  items: Record<string, unknown>[];
+};
+
+type ApiAdminSearchResponse = {
+  total: number;
+  items: Array<{
+    id: number;
+    session_id: string;
+    user_name: string;
+    timestamp: string;
+    topic: string;
+    question_type: string;
+    question: string;
+    answer: string;
+    depth_score: number;
+    is_ai_generated: boolean;
+  }>;
 };
 
 const ERROR_CODE_VALUES = new Set<string>(Object.values(ErrorCode));
@@ -74,6 +124,49 @@ function toPublicUrlResponse(api: ApiPublicUrlResponse): PublicUrlResponse {
   };
 }
 
+function toAdminOverview(api: ApiAdminOverviewResponse): AdminOverviewResponse {
+  return {
+    summary: {
+      totalSessions: api.summary.total_sessions,
+      totalMessages: api.summary.total_messages,
+      activeUsers: api.summary.active_users,
+      avgDepthScore: api.summary.avg_depth_score,
+    },
+    timeSeries: api.time_series.map((p) => ({
+      bucket: p.bucket,
+      sessions: p.sessions,
+      messages: p.messages,
+      uniqueUsers: p.unique_users,
+      avgDepthScore: p.avg_depth_score,
+    })),
+    topUsers: api.top_users.map((u) => ({
+      userName: u.user_name,
+      sessions: u.sessions,
+      messages: u.messages,
+    })),
+    topTopics: api.top_topics.map((t) => ({
+      topic: t.topic,
+      messages: t.messages,
+      avgDepthScore: t.avg_depth_score,
+    })),
+  };
+}
+
+function toAdminSearchRow(api: ApiAdminSearchResponse['items'][number]): AdminSearchRow {
+  return {
+    id: api.id,
+    sessionId: api.session_id,
+    userName: api.user_name,
+    timestamp: api.timestamp,
+    topic: api.topic,
+    questionType: api.question_type,
+    question: api.question,
+    answer: api.answer,
+    depthScore: api.depth_score,
+    isAiGenerated: api.is_ai_generated,
+  };
+}
+
 function getApiBase(): string {
   const fromEnv = (import.meta.env.VITE_API_URL || '').trim();
   if (fromEnv) return fromEnv;
@@ -83,7 +176,7 @@ function getApiBase(): string {
   return 'http://localhost:8000/api';
 }
 
-const API_BASE = getApiBase();
+export const API_BASE = getApiBase();
 
 export class ApiError extends Error {
   code: ErrorCodeType;
@@ -199,4 +292,21 @@ export const sessionApi = {
 
 export const publicUrlApi = {
   get: () => request<ApiPublicUrlResponse>('/public-url').then(toPublicUrlResponse),
+};
+
+export const adminApi = {
+  overview: (params: Record<string, string>, token: string) =>
+    request<ApiAdminOverviewResponse>(`/admin/overview?${new URLSearchParams(params)}`, {
+      headers: { 'X-Admin-Token': token },
+    }).then(toAdminOverview),
+
+  listSessions: (params: Record<string, string>, token: string): Promise<AdminListResponse> =>
+    request<ApiAdminListResponse>(`/admin/sessions?${new URLSearchParams(params)}`, {
+      headers: { 'X-Admin-Token': token },
+    }),
+
+  search: (params: Record<string, string>, token: string) =>
+    request<ApiAdminSearchResponse>(`/admin/search?${new URLSearchParams(params)}`, {
+      headers: { 'X-Admin-Token': token },
+    }).then((r) => ({ total: r.total, items: r.items.map(toAdminSearchRow) })),
 };

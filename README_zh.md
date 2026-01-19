@@ -69,6 +69,7 @@ python start.py
 - 前端: http://localhost:5173
 - 后端 API: http://localhost:8000
 - API 文档: http://localhost:8000/docs
+- 后台监管仪表盘: http://localhost:5173/#admin/overview（需要 `ADMIN_TOKEN`）
 
 按 `Ctrl+C` 停止所有服务。
 
@@ -178,6 +179,17 @@ interview_system/
 | GET | `/api/session/{id}/stats` | 获取统计 |
 | DELETE | `/api/session/{id}` | 删除会话 |
 
+### 后台监管（仪表盘）
+
+通过 `ADMIN_TOKEN` 保护（请求头 `X-Admin-Token`）。若 `ADMIN_TOKEN` 为空，后台监管接口将返回 `404`。
+
+| 方法 | 端点 | 描述 |
+|------|------|------|
+| GET | `/api/admin/overview` | 指标概览 + 时间序列 |
+| GET | `/api/admin/sessions` | 会话列表（过滤 + 分页） |
+| GET | `/api/admin/search` | 搜索对话记录 |
+| GET | `/api/admin/export` | 导出 CSV/JSON/XLSX |
+
 ---
 
 ## 配置说明
@@ -192,6 +204,7 @@ API_MODEL=deepseek-chat
 DATABASE_URL=sqlite+aiosqlite:///./interview_data.db
 LOG_LEVEL=INFO
 ALLOWED_ORIGINS=http://localhost:5173
+ADMIN_TOKEN=change_me  # 启用 /api/admin/*
 
 # 前端 (.env)
 VITE_API_URL=http://localhost:8000/api

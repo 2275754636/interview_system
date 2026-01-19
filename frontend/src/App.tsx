@@ -8,6 +8,26 @@ import { LazyChatbot, LazyCommandPalette } from '@/lib/lazy';
 import { useInterviewStore, useCommandStore, useThemeStore } from '@/stores';
 import { useStartSession, useSendMessage, useUndo, useSkip, useSessionStats } from '@/hooks';
 import { logError } from '@/services/logger';
+import { AdminApp } from '@/components/admin/AdminApp';
+import * as React from 'react';
+import { Button } from '@/components/ui/button';
+import { Shield } from 'lucide-react';
+
+function useHashLocation() {
+  const [hash, setHash] = React.useState(() => window.location.hash || '');
+
+  React.useEffect(() => {
+    const handler = () => setHash(window.location.hash || '');
+    window.addEventListener('hashchange', handler);
+    return () => window.removeEventListener('hashchange', handler);
+  }, []);
+
+  return hash.replace(/^#/, '');
+}
+
+function isAdminHash(hash: string) {
+  return hash === 'admin' || hash.startsWith('admin/');
+}
 
 function InterviewApp() {
   const { session, messages, isLoading, canUndo } = useInterviewStore();
@@ -25,6 +45,7 @@ function InterviewApp() {
     { id: 'theme-dark', label: '深色模式', shortcut: '⌘2', onSelect: () => setMode('dark') },
     { id: 'theme-system', label: '跟随系统', shortcut: '⌘3', onSelect: () => setMode('system') },
     { id: 'restart', label: '重新开始', shortcut: '⌘R', onSelect: () => startSession.mutate(undefined) },
+    { id: 'admin', label: '后台监管仪表盘', shortcut: '⌘D', onSelect: () => (window.location.hash = '#admin/overview') },
   ];
 
   const handleSend = async (text: string) => {
@@ -70,6 +91,18 @@ function InterviewApp() {
                   <li>• 按 Ctrl+K 打开命令面板</li>
                   <li>• 可随时撤回或跳过问题</li>
                 </ul>
+
+                <div className="mt-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-start gap-2"
+                    onClick={() => (window.location.hash = '#admin/overview')}
+                  >
+                    <Shield className="h-4 w-4" />
+                    后台监管仪表盘
+                  </Button>
+                </div>
               </div>
 
               {session && statsLoading && <StatsSkeleton />}
@@ -108,10 +141,11 @@ function InterviewApp() {
 }
 
 export default function App() {
+  const hash = useHashLocation();
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <InterviewApp />
+        {isAdminHash(hash) ? <AdminApp currentHash={hash} /> : <InterviewApp />}
       </ThemeProvider>
     </QueryClientProvider>
   );

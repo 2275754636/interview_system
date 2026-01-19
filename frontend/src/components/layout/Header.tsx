@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { lazyLoad } from "@/lib/lazy";
 import { Command, Share2 } from "lucide-react";
 import { useRef, useState } from "react";
+import type { ReactNode } from "react";
 
 const LazyQRCodeDialog = lazyLoad(
   () =>
@@ -14,9 +15,10 @@ interface HeaderProps {
   title: string;
   subtitle?: string;
   onCommandOpen?: () => void;
+  actions?: ReactNode;
 }
 
-export function Header({ title, subtitle, onCommandOpen }: HeaderProps) {
+export function Header({ title, subtitle, onCommandOpen, actions }: HeaderProps) {
   const [shareOpen, setShareOpen] = useState(false);
   const didWarmupShare = useRef(false);
   const didWarmupCommand = useRef(false);
@@ -45,6 +47,8 @@ export function Header({ title, subtitle, onCommandOpen }: HeaderProps) {
         </div>
 
         <div className="flex items-center gap-2">
+          {actions ? actions : null}
+
           <Button
             variant="outline"
             size="sm"

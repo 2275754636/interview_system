@@ -22,6 +22,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        populate_by_name=True,
     )
 
     database_url: str = Field(
@@ -40,6 +41,12 @@ class Settings(BaseSettings):
         default_factory=list,
         validation_alias="ALLOWED_ORIGINS",
         description="CORS 允许的来源列表（逗号分隔）",
+    )
+
+    admin_token: str = Field(
+        default="",
+        validation_alias="ADMIN_TOKEN",
+        description="后台监管接口 Token（使用 X-Admin-Token 访问）。为空则禁用后台监管接口。",
     )
 
     @field_validator("allowed_origins", mode="before")

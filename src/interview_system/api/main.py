@@ -14,7 +14,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from interview_system.api.exceptions import register_exception_handlers
-from interview_system.api.routes import health, interview, session
+from interview_system.api.routes import admin, health, interview, session
 from interview_system.config import settings as _settings
 from interview_system.config.logging import configure_logging
 from interview_system.config.settings import Settings
@@ -155,6 +155,7 @@ def create_app(settings: Settings) -> FastAPI:
 
     app.include_router(session.router, prefix="/api")
     app.include_router(interview.router, prefix="/api")
+    app.include_router(admin.router, prefix="/api")
     app.include_router(health.router)
 
     @app.get("/api/public-url")
