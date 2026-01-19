@@ -28,6 +28,9 @@
 - Dynamic follow-up questions (max 3 per question)
 - Context-aware AI responses
 - Multi-user concurrent sessions
+- Admin dashboard with analytics & export (CSV/JSON/XLSX)
+- Public URL sharing with QR code (cloudflared/ngrok)
+- External configuration (YAML-based keywords)
 
 </td>
 <td width="50%">
@@ -65,11 +68,29 @@ python start.py
 
 Auto-detects environment, installs dependencies, starts all services.
 
+#### First-Run Configuration
+
+On first run, you'll be prompted to:
+- Select a provider (deepseek/openai/qwen/glm/ernie)
+- Enter API Key (masked)
+- Enter Secret Key for ERNIE (masked)
+- Optionally override the model (press Enter to use default)
+
+**API Validation:**
+- The system validates your API key before starting
+- If validation fails, the system automatically falls back to preset questions
+- You can still use the interview system without a valid API key (limited to preset questions)
+
+**Admin Token:**
+- System automatically generates a 32-character random password on startup
+- Token is displayed prominently in the terminal (after startup completes)
+- New token generated on each startup for enhanced security
+
 **Access:**
 - Frontend: http://localhost:5173
 - Backend API: http://localhost:8000
 - API Docs: http://localhost:8000/docs
-- Admin Dashboard: http://localhost:5173/#admin/overview (requires `ADMIN_TOKEN`)
+- Admin Dashboard: http://localhost:5173/#admin/overview
 
 Press `Ctrl+C` to stop all services.
 
@@ -85,11 +106,11 @@ Exposes services via cloudflared/ngrok for remote access.
 - [Cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/) (recommended, no signup)
 - [Ngrok](https://ngrok.com/download) (fallback)
 
-**Output:**
-```
-前端 公网: https://abc123.trycloudflare.com
-后端 公网: https://def456.trycloudflare.com
-```
+**Features:**
+- Prints public URLs when tunnel is ready
+- Displays ASCII QR code in terminal for easy mobile access
+- Frontend shows QR code dialog (click share icon in header)
+- Tunnel state persisted in `.public_url_state.json`
 
 <details>
 <summary>Manual Setup</summary>
@@ -198,17 +219,24 @@ Protected by `ADMIN_TOKEN` (request header `X-Admin-Token`). If `ADMIN_TOKEN` is
 
 ```ini
 # Backend (.env)
-API_PROVIDER=deepseek
+API_PROVIDER=deepseek  # deepseek/openai/qwen/zhipu/baidu
 API_KEY=your_api_key_here
 API_MODEL=deepseek-chat
+API_SECRET_KEY=your_secret_key_here  # baidu only
 DATABASE_URL=sqlite+aiosqlite:///./interview_data.db
 LOG_LEVEL=INFO
 ALLOWED_ORIGINS=http://localhost:5173
-ADMIN_TOKEN=change_me  # enables /api/admin/*
+ADMIN_TOKEN=auto_generated  # Auto-generated on startup, no manual config needed
 
 # Frontend (.env)
 VITE_API_URL=http://localhost:8000/api
 ```
+
+**Notes:**
+- `glm` is stored as `API_PROVIDER=zhipu` in `.env`
+- `ernie` is stored as `API_PROVIDER=baidu` in `.env`
+- Setting `API_KEY=""` (empty) forces preset questions only (no AI followups)
+- `ADMIN_TOKEN` is auto-generated on each startup, no manual configuration required
 
 ### API Providers
 
@@ -219,6 +247,48 @@ VITE_API_URL=http://localhost:8000/api
 | Qwen | `qwen-turbo` | [dashscope.console.aliyun.com](https://dashscope.console.aliyun.com/) |
 | GLM | `glm-4-flash` | [open.bigmodel.cn](https://open.bigmodel.cn/) |
 | ERNIE | `ernie-3.5-8k` | [qianfan.baidubce.com](https://qianfan.baidubce.com/) |
+
+### Interview Keywords Configuration
+
+Depth-scoring keywords are externalized to `config/interview_keywords.yaml`:
+
+```yaml
+depth_keywords:
+  - "具体"
+  - "例如"
+  - "因为"
+  # ... more keywords
+```
+
+The system automatically loads this file with fallback to hardcoded defaults. You can customize keywords without modifying code.
+
+---
+
+## Troubleshooting
+
+### Text Input Disabled
+
+**Symptom:** Cannot type in the message input field.
+
+**Cause:** Session not started, or waiting for the first question.
+
+**Solution:**
+- Click "快速访谈" (Quick Interview) and wait until the first question appears.
+
+### API Validation Failed
+
+**Symptom:** Warning message during startup:
+```
+⚠ API 验证失败: [error details]
+  回退模式: 使用预设问题
+```
+
+**Cause:** Invalid API key, network issues, or provider service unavailable.
+
+**Solution:**
+- Check `.env` (`API_PROVIDER`, `API_KEY`, `API_SECRET_KEY` for baidu)
+- Re-run `python start.py` to reconfigure
+- Or force preset mode with `API_KEY=""`
 
 ---
 

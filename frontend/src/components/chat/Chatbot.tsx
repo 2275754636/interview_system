@@ -1,11 +1,19 @@
 import { useEffect, useRef } from 'react';
 import type { Message } from '@/types';
+import type { SessionState } from '@/stores';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { MessageBubble } from './MessageBubble';
 import { MessageInput } from './MessageInput';
 import { ActionBar } from './ActionBar';
 import { MessageSkeleton } from './MessageSkeleton';
+
+const PLACEHOLDER_BY_STATE: Record<SessionState, string> = {
+  IDLE: '点击"快速访谈"开始',
+  INITIALIZING: '正在初始化访谈...',
+  ACTIVE: '输入您的回答...',
+  FINISHED: '访谈已结束，可重新开始',
+};
 
 interface ChatbotProps {
   messages: Message[];
@@ -17,6 +25,7 @@ interface ChatbotProps {
   canUndo?: boolean;
   canSkip?: boolean;
   isLoading?: boolean;
+  sessionState?: SessionState;
 }
 
 export function Chatbot({
@@ -29,9 +38,12 @@ export function Chatbot({
   canUndo = false,
   canSkip = false,
   isLoading = false,
+  sessionState = 'IDLE',
 }: ChatbotProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const isEmpty = messages.length === 0 && !isLoading;
+  const isInputDisabled = sessionState !== 'ACTIVE' || isLoading;
+  const placeholder = isLoading ? '等待回复...' : PLACEHOLDER_BY_STATE[sessionState];
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -61,8 +73,9 @@ export function Chatbot({
                 onClick={onStartInterview}
                 className="btn-hover"
                 aria-label="开始新的访谈"
+                disabled={sessionState === 'INITIALIZING'}
               >
-                快速访谈
+                {sessionState === 'INITIALIZING' ? '正在启动...' : '快速访谈'}
               </Button>
             </div>
           ) : (
@@ -88,7 +101,11 @@ export function Chatbot({
           canUndo={canUndo}
           canSkip={canSkip}
         />
-        <MessageInput onSend={onSend} disabled={isLoading} />
+        <MessageInput
+          onSend={onSend}
+          disabled={isInputDisabled}
+          placeholder={placeholder}
+        />
       </div>
     </div>
   );

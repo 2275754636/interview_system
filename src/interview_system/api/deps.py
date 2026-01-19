@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import secrets
 
 from fastapi import Header, Request
@@ -91,6 +92,7 @@ def get_interview_service(request: Request) -> InterviewService:
                 return None
 
     repo = get_session_repository(request)
+    api_key = (os.getenv("API_KEY") or "").strip()
 
     processor = AnswerProcessor(
         depth_keywords=INTERVIEW_CONFIG.depth_keywords,
@@ -99,7 +101,7 @@ def get_interview_service(request: Request) -> InterviewService:
     )
 
     followup = FollowupGenerator(
-        llm=_LLM(),
+        llm=_LLM() if api_key else None,
         min_answer_length=INTERVIEW_CONFIG.min_answer_length,
         max_followups_per_question=INTERVIEW_CONFIG.max_followups_per_question,
         max_depth_score=INTERVIEW_CONFIG.max_depth_score,

@@ -9,6 +9,7 @@ describe('InterviewStore', () => {
       messages: [],
       undoStack: [],
       isLoading: false,
+      sessionState: 'IDLE',
     });
   });
 

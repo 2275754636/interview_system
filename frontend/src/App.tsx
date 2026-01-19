@@ -12,6 +12,20 @@ import { AdminApp } from '@/components/admin/AdminApp';
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Shield } from 'lucide-react';
+import type { ThemeMode } from '@/types';
+
+type CommandMeta =
+  | { id: string; label: string; shortcut: string; kind: 'theme'; mode: ThemeMode }
+  | { id: string; label: string; shortcut: string; kind: 'restart' }
+  | { id: string; label: string; shortcut: string; kind: 'admin' };
+
+const COMMAND_META: CommandMeta[] = [
+  { id: 'theme-light', label: '浅色模式', shortcut: '⌘1', kind: 'theme', mode: 'light' },
+  { id: 'theme-dark', label: '深色模式', shortcut: '⌘2', kind: 'theme', mode: 'dark' },
+  { id: 'theme-system', label: '跟随系统', shortcut: '⌘3', kind: 'theme', mode: 'system' },
+  { id: 'restart', label: '重新开始', shortcut: '⌘R', kind: 'restart' },
+  { id: 'admin', label: '后台监管仪表盘', shortcut: '⌘D', kind: 'admin' },
+];
 
 function useHashLocation() {
   const [hash, setHash] = React.useState(() => window.location.hash || '');
@@ -30,7 +44,7 @@ function isAdminHash(hash: string) {
 }
 
 function InterviewApp() {
-  const { session, messages, isLoading, canUndo } = useInterviewStore();
+  const { session, messages, isLoading, canUndo, sessionState, setSessionState } = useInterviewStore();
   const { isOpen, toggle, close } = useCommandStore();
   const { setMode } = useThemeStore();
 
@@ -40,29 +54,35 @@ function InterviewApp() {
   const skip = useSkip();
   const { data: stats, isLoading: statsLoading } = useSessionStats(session?.id || null);
 
-  const commands = [
-    { id: 'theme-light', label: '浅色模式', shortcut: '⌘1', onSelect: () => setMode('light') },
-    { id: 'theme-dark', label: '深色模式', shortcut: '⌘2', onSelect: () => setMode('dark') },
-    { id: 'theme-system', label: '跟随系统', shortcut: '⌘3', onSelect: () => setMode('system') },
-    { id: 'restart', label: '重新开始', shortcut: '⌘R', onSelect: () => startSession.mutate(undefined) },
-    { id: 'admin', label: '后台监管仪表盘', shortcut: '⌘D', onSelect: () => (window.location.hash = '#admin/overview') },
-  ];
+  const openAdmin = () => {
+    window.location.hash = '#admin/overview';
+  };
+
+  const beginSession = async () => {
+    setSessionState('INITIALIZING');
+    try {
+      await startSession.mutateAsync(undefined);
+    } catch (err: unknown) {
+      logError('App', '启动访谈失败', err);
+      setSessionState('IDLE');
+    }
+  };
+
+  const commands = COMMAND_META.map((cmd) => {
+    if (cmd.kind === 'theme') {
+      return { id: cmd.id, label: cmd.label, shortcut: cmd.shortcut, onSelect: () => setMode(cmd.mode) };
+    }
+    if (cmd.kind === 'restart') {
+      return { id: cmd.id, label: cmd.label, shortcut: cmd.shortcut, onSelect: () => void beginSession() };
+    }
+    return { id: cmd.id, label: cmd.label, shortcut: cmd.shortcut, onSelect: openAdmin };
+  });
 
   const handleSend = async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return;
-
-    try {
-      if (!session) {
-        const { session: newSession } = await startSession.mutateAsync(undefined);
-        sendMessage.mutate({ sessionId: newSession.id, text: trimmed });
-        return;
-      }
-
-      sendMessage.mutate({ sessionId: session.id, text: trimmed });
-    } catch (err: unknown) {
-      logError('App', '发送消息失败', err);
-    }
+    if (!session || sessionState !== 'ACTIVE') return;
+    sendMessage.mutate({ sessionId: session.id, text: trimmed });
   };
 
   return (
@@ -126,11 +146,12 @@ function InterviewApp() {
                 onSend={handleSend}
                 onUndo={() => session && undo.mutate({ sessionId: session.id })}
                 onSkip={() => session && skip.mutate({ sessionId: session.id })}
-                onRestart={() => startSession.mutate(undefined)}
-                onStartInterview={() => startSession.mutate(undefined)}
+                onRestart={() => void beginSession()}
+                onStartInterview={beginSession}
                 canUndo={canUndo()}
                 canSkip={!!session}
                 isLoading={isLoading}
+                sessionState={sessionState}
               />
             </div>
           </main>

@@ -3,11 +3,21 @@ import type { Message, Session } from '@/types';
 
 const MAX_UNDO_STACK = 10;
 
+export type SessionState = 'IDLE' | 'INITIALIZING' | 'ACTIVE' | 'FINISHED';
+
+function deriveSessionState(session: Session | null, messages: Message[]): SessionState {
+  if (!session) return 'IDLE';
+  if (session.status === 'completed') return 'FINISHED';
+  if (messages.some((m) => m.role === 'assistant')) return 'ACTIVE';
+  return 'INITIALIZING';
+}
+
 interface InterviewState {
   session: Session | null;
   messages: Message[];
   undoStack: Message[][];
   isLoading: boolean;
+  sessionState: SessionState;
 
   setSession: (session: Session | null) => void;
   addMessage: (message: Message) => void;
@@ -15,6 +25,7 @@ interface InterviewState {
   undo: () => void;
   clearMessages: () => void;
   setLoading: (loading: boolean) => void;
+  setSessionState: (state: SessionState) => void;
   canUndo: () => boolean;
 }
 
@@ -23,8 +34,13 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
   messages: [],
   undoStack: [],
   isLoading: false,
+  sessionState: 'IDLE',
 
-  setSession: (session) => set({ session }),
+  setSession: (session) =>
+    set((state) => ({
+      session,
+      sessionState: deriveSessionState(session, state.messages),
+    })),
 
   addMessage: (message) =>
     set((state) => {
@@ -34,10 +50,16 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
       return {
         messages: newMessages,
         undoStack: newStack,
+        sessionState: deriveSessionState(state.session, newMessages),
       };
     }),
 
-  setMessages: (messages) => set({ messages, undoStack: [] }),
+  setMessages: (messages) =>
+    set((state) => ({
+      messages,
+      undoStack: [],
+      sessionState: deriveSessionState(state.session, messages),
+    })),
 
   undo: () =>
     set((state) => {
@@ -49,12 +71,15 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
       return {
         messages: previous,
         undoStack: newStack,
+        sessionState: deriveSessionState(state.session, previous),
       };
     }),
 
-  clearMessages: () => set({ messages: [], undoStack: [] }),
+  clearMessages: () => set({ messages: [], undoStack: [], sessionState: 'IDLE' }),
 
   setLoading: (loading) => set({ isLoading: loading }),
 
-  canUndo: () => get().messages.length > 1,
+  setSessionState: (sessionState) => set({ sessionState }),
+
+  canUndo: () => get().undoStack.length > 0,
 }));
